@@ -1,0 +1,22 @@
+# GCP
+gcp_project_id = ""
+gcp_region     = ""
+
+# Telegram
+telegram_bot_token = ""
+telegram_chat_id   = ""
+
+# Strava (из настроек приложения + скрипта strava_auth.py)
+strava_client_id     = ""
+strava_client_secret = ""
+strava_refresh_token = ""
+
+# Garmin Connect
+garmin_email    = ""
+garmin_password = ""
+
+# Anthropic
+anthropic_api_key = "sk-ant-ap"
+
+# Расписание синхронизации (cron, UTC)
+sync_schedule = "0 1 * * *"
