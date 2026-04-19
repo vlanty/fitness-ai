@@ -1,4 +1,3 @@
-```hcl
 resource "google_bigquery_dataset" "fitness" {
   dataset_id  = "fitness"
   description = "Fitness AI data"
@@ -106,4 +105,3 @@ resource "google_bigquery_table" "daily_stats" {
 output "dataset_id" {
   value = google_bigquery_dataset.fitness.dataset_id
 }
-```

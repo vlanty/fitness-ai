@@ -1,4 +1,3 @@
-```hcl
 locals {
   secret_names = [
     "telegram_bot_token", "telegram_chat_id",
@@ -112,4 +111,3 @@ output "collector_job_name" {
 output "bot_url" {
   value = google_cloud_run_v2_service.bot.uri
 }
-```

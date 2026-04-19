@@ -1,4 +1,3 @@
-```hcl
 resource "google_cloud_scheduler_job" "daily_sync" {
   name      = "fitness-daily-sync"
   schedule  = var.schedule
@@ -14,4 +13,3 @@ resource "google_cloud_scheduler_job" "daily_sync" {
     }
   }
 }
-```

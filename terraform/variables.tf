@@ -1,4 +1,3 @@
-```hcl
 variable "gcp_project_id" {
   type = string
 }
@@ -51,4 +50,3 @@ variable "sync_schedule" {
   type    = string
   default = "0 1 * * *"
 }
-```

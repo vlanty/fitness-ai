@@ -1,4 +1,3 @@
-```hcl
 terraform {
   required_providers {
     google = {
@@ -105,4 +104,3 @@ module "scheduler" {
   project_id      = var.gcp_project_id
   depends_on      = [module.cloud_run]
 }
-```
