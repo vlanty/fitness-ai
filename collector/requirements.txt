@@ -1,5 +1,5 @@
+garth==0.4.46
 garminconnect==0.2.22
-garth==0.4.45
 requests==2.31.0
 google-cloud-bigquery==3.17.2
 google-cloud-secret-manager==2.20.0

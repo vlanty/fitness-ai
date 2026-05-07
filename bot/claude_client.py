@@ -39,7 +39,7 @@ NUTRITION_PROMPT = """Ты спортивный нутрициолог. Даёш
 def analyze(prompt_template, data_summary, api_key):
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-5",
         max_tokens=1000,
         messages=[{"role": "user", "content": prompt_template.format(data=data_summary)}],
     )
