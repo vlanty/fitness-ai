@@ -1,20 +1,21 @@
-variable "secrets" {
-  type = map(string)
+# Secret containers only. Values are NOT managed by Terraform (they never land
+# in tfvars or state): add them with scripts/setup.py or
+#   gcloud secrets versions add <name> --data-file=-
+variable "secret_names" {
+  type = set(string)
 }
 
 resource "google_secret_manager_secret" "s" {
-  for_each  = var.secrets
+  for_each  = var.secret_names
   secret_id = each.key
 
   replication {
     auto {}
   }
-}
 
-resource "google_secret_manager_secret_version" "v" {
-  for_each    = var.secrets
-  secret      = google_secret_manager_secret.s[each.key].id
-  secret_data = each.value
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 output "secret_ids" {

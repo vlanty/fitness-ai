@@ -16,6 +16,11 @@ resource "google_cloud_run_v2_job" "collector" {
   name     = "fitness-collector"
   location = var.region
 
+  # gcloud deploys stamp these; not part of the configuration.
+  lifecycle {
+    ignore_changes = [client, client_version]
+  }
+
   template {
     template {
       service_account = var.service_account
@@ -59,6 +64,11 @@ resource "google_cloud_run_v2_service" "bot" {
   name     = "fitness-bot"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
+
+  # gcloud deploys stamp these; not part of the configuration.
+  lifecycle {
+    ignore_changes = [client, client_version]
+  }
 
   template {
     service_account = var.service_account

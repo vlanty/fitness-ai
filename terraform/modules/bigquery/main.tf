@@ -7,7 +7,7 @@ resource "google_bigquery_dataset" "fitness" {
 resource "google_bigquery_table" "activities" {
   dataset_id          = google_bigquery_dataset.fitness.dataset_id
   table_id            = "activities"
-  deletion_protection = false
+  deletion_protection = true
 
   time_partitioning {
     type  = "DAY"
@@ -35,7 +35,7 @@ resource "google_bigquery_table" "activities" {
 resource "google_bigquery_table" "sleep" {
   dataset_id          = google_bigquery_dataset.fitness.dataset_id
   table_id            = "sleep"
-  deletion_protection = false
+  deletion_protection = true
 
   time_partitioning {
     type  = "DAY"
@@ -61,7 +61,7 @@ resource "google_bigquery_table" "sleep" {
 resource "google_bigquery_table" "hrv" {
   dataset_id          = google_bigquery_dataset.fitness.dataset_id
   table_id            = "hrv"
-  deletion_protection = false
+  deletion_protection = true
 
   time_partitioning {
     type  = "DAY"
@@ -81,7 +81,7 @@ resource "google_bigquery_table" "hrv" {
 resource "google_bigquery_table" "daily_stats" {
   dataset_id          = google_bigquery_dataset.fitness.dataset_id
   table_id            = "daily_stats"
-  deletion_protection = false
+  deletion_protection = true
 
   time_partitioning {
     type  = "DAY"

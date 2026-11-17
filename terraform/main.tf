@@ -66,16 +66,12 @@ resource "google_artifact_registry_repository" "repo" {
 
 module "secrets" {
   source = "./modules/secrets"
-  secrets = {
-    telegram_bot_token   = var.telegram_bot_token
-    telegram_chat_id     = var.telegram_chat_id
-    strava_client_id     = var.strava_client_id
-    strava_client_secret = var.strava_client_secret
-    strava_refresh_token = var.strava_refresh_token
-    garmin_email         = var.garmin_email
-    garmin_password      = var.garmin_password
-    anthropic_api_key    = var.anthropic_api_key
-  }
+  secret_names = [
+    "telegram_bot_token", "telegram_chat_id",
+    "strava_client_id", "strava_client_secret", "strava_refresh_token",
+    "garmin_email", "garmin_password",
+    "anthropic_api_key",
+  ]
   depends_on = [google_project_service.apis]
 }
 
