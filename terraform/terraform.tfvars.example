@@ -5,5 +5,9 @@ gcp_region     = "europe-west3"
 # Расписание синхронизации (cron, UTC)
 sync_schedule = "0 1 * * *"
 
+# Необязательно: другая модель Claude для задачи бота (chat, analysis, weekly, alerts, morning).
+# По умолчанию: chat/analysis — claude-sonnet-5-5, остальное — claude-haiku-5-5.
+# bot_models = { chat = "claude-opus-5-5" }
+
 # Значения секретов (Telegram, Anthropic, ключи источников данных) здесь
 # больше не хранятся — они задаются прямо в Secret Manager.

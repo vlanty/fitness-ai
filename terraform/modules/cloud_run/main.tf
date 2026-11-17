@@ -85,6 +85,15 @@ resource "google_cloud_run_v2_service" "bot" {
         }
       }
 
+      # Optional Claude model overrides per task, e.g. { chat = "claude-opus-5-5" } -> MODEL_CHAT.
+      dynamic "env" {
+        for_each = var.bot_models
+        content {
+          name  = "MODEL_${upper(env.key)}"
+          value = env.value
+        }
+      }
+
       # The bot never talks to data sources: Telegram + Anthropic only.
       dynamic "env" {
         for_each = toset(var.bot_secrets)
