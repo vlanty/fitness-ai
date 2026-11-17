@@ -1,4 +1,12 @@
 terraform {
+  required_version = ">= 1.7"
+
+  # State lives in a GCS bucket (created by scripts/setup.py):
+  #   terraform init -backend-config="bucket=<project>-tfstate"
+  backend "gcs" {
+    prefix = "fitness-ai"
+  }
+
   required_providers {
     google = {
       source  = "hashicorp/google"
@@ -12,6 +20,19 @@ provider "google" {
   region  = var.gcp_region
 }
 
+locals {
+  # Secrets every deployment needs.
+  core_secrets = ["telegram_bot_token", "telegram_chat_id", "anthropic_api_key"]
+
+  # Secrets per data source. Add a new source here (and in collector/sources).
+  source_secrets = {
+    garmin = ["garmin_personal_api_key"]
+    strava = ["strava_client_id", "strava_client_secret", "strava_refresh_token"]
+  }
+
+  collector_secrets = distinct(flatten([for s in var.data_sources : local.source_secrets[s]]))
+}
+
 # Включаем нужные GCP APIs
 resource "google_project_service" "apis" {
   for_each = toset([
@@ -20,6 +41,7 @@ resource "google_project_service" "apis" {
     "secretmanager.googleapis.com",
     "bigquery.googleapis.com",
     "artifactregistry.googleapis.com",
+    "storage.googleapis.com",
   ])
   service            = each.value
   disable_on_destroy = false
@@ -64,31 +86,52 @@ resource "google_artifact_registry_repository" "repo" {
   depends_on    = [google_project_service.apis]
 }
 
+# Raw provider files (.FIT archives etc.)
+resource "google_storage_bucket" "raw" {
+  name                        = "${var.gcp_project_id}-fitness-raw"
+  location                    = var.gcp_region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  force_destroy               = false
+  depends_on                  = [google_project_service.apis]
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "google_storage_bucket_iam_member" "runner_raw" {
+  bucket = google_storage_bucket.raw.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.runner.email}"
+}
+
 module "secrets" {
-  source = "./modules/secrets"
-  secret_names = [
-    "telegram_bot_token", "telegram_chat_id",
-    "strava_client_id", "strava_client_secret", "strava_refresh_token",
-    "garmin_email", "garmin_password",
-    "anthropic_api_key",
-  ]
-  depends_on = [google_project_service.apis]
+  source       = "./modules/secrets"
+  secret_names = concat(local.core_secrets, local.collector_secrets)
+  retired      = var.retired_secrets
+  depends_on   = [google_project_service.apis]
 }
 
 module "bigquery" {
-  source     = "./modules/bigquery"
-  project_id = var.gcp_project_id
-  depends_on = [google_project_service.apis]
+  source       = "./modules/bigquery"
+  project_id   = var.gcp_project_id
+  data_sources = var.data_sources
+  depends_on   = [google_project_service.apis]
 }
 
 module "cloud_run" {
-  source          = "./modules/cloud_run"
-  project_id      = var.gcp_project_id
-  region          = var.gcp_region
-  service_account = google_service_account.runner.email
-  image_base      = "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/fitness-ai"
-  bq_dataset      = module.bigquery.dataset_id
-  depends_on      = [module.secrets, module.bigquery, google_artifact_registry_repository.repo]
+  source            = "./modules/cloud_run"
+  project_id        = var.gcp_project_id
+  region            = var.gcp_region
+  service_account   = google_service_account.runner.email
+  image_base        = "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/fitness-ai"
+  bq_dataset        = module.bigquery.dataset_id
+  data_sources      = var.data_sources
+  raw_bucket        = google_storage_bucket.raw.name
+  bot_secrets       = local.core_secrets
+  collector_secrets = local.collector_secrets
+  depends_on        = [module.secrets, module.bigquery, google_artifact_registry_repository.repo]
 }
 
 module "scheduler" {

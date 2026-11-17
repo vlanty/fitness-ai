@@ -10,3 +10,12 @@ output "collector_job_name" {
 output "artifact_registry" {
   value = "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/fitness-ai"
 }
+
+output "raw_bucket" {
+  value = google_storage_bucket.raw.name
+}
+
+output "secrets_to_fill" {
+  description = "Секреты, которым нужно значение (scripts/setup.py secrets)."
+  value       = concat(local.core_secrets, local.collector_secrets)
+}

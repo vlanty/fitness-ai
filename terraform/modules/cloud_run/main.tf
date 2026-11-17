@@ -1,14 +1,12 @@
 locals {
-  secret_names = [
-    "telegram_bot_token", "telegram_chat_id",
-    "strava_client_id", "strava_client_secret", "strava_refresh_token",
-    "garmin_email", "garmin_password",
-    "anthropic_api_key",
-  ]
   common_env_vars = [
     { name = "GCP_PROJECT", value = var.project_id },
-    { name = "BQ_DATASET",  value = var.bq_dataset },
+    { name = "BQ_DATASET", value = var.bq_dataset },
+    { name = "DATA_SOURCES", value = join(",", var.data_sources) },
   ]
+  collector_env_vars = concat(local.common_env_vars, [
+    { name = "RAW_BUCKET", value = var.raw_bucket },
+  ])
 }
 
 # ── Collector Job ──────────────────────────────────────────────────────────────
@@ -30,15 +28,16 @@ resource "google_cloud_run_v2_job" "collector" {
         image = "${var.image_base}/collector:latest"
 
         dynamic "env" {
-          for_each = local.common_env_vars
+          for_each = local.collector_env_vars
           content {
             name  = env.value.name
             value = env.value.value
           }
         }
 
+        # Only the enabled sources' secrets.
         dynamic "env" {
-          for_each = toset(local.secret_names)
+          for_each = toset(var.collector_secrets)
           content {
             name = upper(env.value)
             value_source {
@@ -86,8 +85,9 @@ resource "google_cloud_run_v2_service" "bot" {
         }
       }
 
+      # The bot never talks to data sources: Telegram + Anthropic only.
       dynamic "env" {
-        for_each = toset(local.secret_names)
+        for_each = toset(var.bot_secrets)
         content {
           name = upper(env.value)
           value_source {
