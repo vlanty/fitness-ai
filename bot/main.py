@@ -8,6 +8,8 @@ from telegram.ext import Application, CallbackQueryHandler, CommandHandler, Mess
 from handlers import COMMANDS, cmd_start, on_menu_button, on_text, setup_menu
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# httpx logs every request URL at INFO, and Telegram URLs contain the bot token.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
