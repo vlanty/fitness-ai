@@ -12,10 +12,12 @@ nutritionist.
 - Sync every few hours of activities and daily health (sleep, HRV, resting HR, stress, Body Battery, steps, VO2 max — depending on the source)
 - Telegram bot (answers only your chat):
   - just ask — «как прошла последняя тренировка?», «как я спал вчера?»
-  - `/today` — last workout + latest day of health data
+  - `/today` — last workout, latest health day, training load, readiness and training status (fitness-ai estimates)
   - `/week` — current week summary
   - `/coach`, `/health`, `/nutrition` — AI analysis
   - `/status` — freshness of each data source
+- Training load from Garmin's per-activity EPOC: acute / chronic load, load ratio, load focus, VO2 max trend
+- Full history on first install (`BACKFILL_FROM`), several sources merged without duplicates
 
 ## Architecture
 
@@ -23,15 +25,24 @@ nutritionist.
 Cloud Scheduler (every 4 h)
         │
         ▼
-Cloud Run Job "collector" ── sources/garmin.py ── Garmin Personal API
-        │                └─ sources/strava.py ── Strava API
+Cloud Run Job "collector"  ── DATA_SOURCES=garmin,strava (order = priority)
+        │   sources/garmin.py ── Garmin Personal API (personal key → 24 h token)
+        │   sources/strava.py ── Strava API (OAuth refresh token)
         ├── raw files (.FIT) ──► GCS bucket <project>-fitness-raw
         ▼
-BigQuery: activities, health_daily, ingest_state
-          views: activities_unified, health_daily_unified
+BigQuery dataset "fitness"
+  tables: activities, health_daily      (one row per source + id/day, MERGE = idempotent)
+          ingest_state                  (cursor and last status per source)
+  views:  activities_unified            (duplicates across sources removed)
+          health_daily_unified          (each field from the highest-priority source)
+          training_load_daily           (acute/chronic load, ratio, focus, VO2 max trend)
         │
         ▼
-Cloud Run Service "bot" (Telegram webhook) ── Claude API
+Cloud Run Service "bot" (Telegram webhook, owner chat only)
+        ├── bot/estimates.py ── readiness & training status (our estimates)
+        └── Claude API
+
+Secrets: Secret Manager (values never in Terraform)   State: GCS bucket <project>-tfstate
 ```
 
 ## Data sources
@@ -47,7 +58,7 @@ You pick sources at setup (`data_sources` in `terraform.tfvars`). **Order = prio
 
 - Each source is pulled separately with its own cursor; one failing does not stop the others, but the job run is marked failed and the bot shows a warning.
 - Tables keep everything that arrived (`source` column, key `source + id/date`).
-- `activities_unified` removes duplicates: the same workout from two sources = start time within **±5 min** and duration within **10 %**. The row from the source listed first in `data_sources` is kept; `also_in` shows where else it was found. Sources no longer enabled (e.g. old Strava history) rank last but their unique workouts stay visible.
+- `activities_unified` removes duplicates: the same workout from two sources = start time within **±5 min** and moving *or* elapsed duration within **10 %**. The row from the source listed first in `data_sources` is kept; `also_in` shows where else it was found. Sources no longer enabled (e.g. old Strava history) rank last but their unique workouts stay visible.
 - `health_daily_unified` takes each field per day from the highest-priority source that has it.
 
 ### Garmin Connect (official Personal API)

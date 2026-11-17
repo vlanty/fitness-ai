@@ -55,7 +55,7 @@ def test_parse_activity_uses_utc_start_local_date_and_moving_time():
     row = parse_activity(ACT)
     assert row["start_time"] == "2026-11-16T04:05:00+00:00"
     assert row["activity_date"] == "2026-11-16"
-    assert row["duration_seconds"] == 3000
+    assert row["duration_seconds"] == 3000 and row["elapsed_seconds"] == 3100
     assert row["avg_pace_sec_per_km"] == 300.0
     assert row["avg_heart_rate"] == 150
     assert (row["aerobic_te"], row["training_load"], row["vo2max"]) == (3.4, 120.5, 52.0)

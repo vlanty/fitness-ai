@@ -168,6 +168,7 @@ def parse_activity(a: dict) -> dict:
         "type": type_key,
         "distance_meters": dist,
         "duration_seconds": _int(moving),
+        "elapsed_seconds": _int(a.get("elapsedDuration") or a.get("duration")),
         "elevation_gain": _float(a.get("elevationGain")),
         "avg_heart_rate": _int(a.get("averageHR")),
         "max_heart_rate": _int(a.get("maxHR")),

@@ -33,6 +33,7 @@ def parse_activity(raw: dict) -> dict:
         "type": raw.get("type"),
         "distance_meters": float(dist),
         "duration_seconds": _int(duration),
+        "elapsed_seconds": _int(raw.get("elapsed_time")),
         "elevation_gain": float(raw.get("total_elevation_gain") or 0),
         "avg_heart_rate": _int(raw.get("average_heartrate")),
         "max_heart_rate": _int(raw.get("max_heartrate")),

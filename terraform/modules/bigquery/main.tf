@@ -53,6 +53,7 @@ resource "google_bigquery_table" "activities" {
     { name = "raw_file", type = "STRING", mode = "NULLABLE", description = "Object path in the raw bucket (.FIT zip)" },
     { name = "ingested_at", type = "TIMESTAMP", mode = "NULLABLE" },
     { name = "training_effect_label", type = "STRING", mode = "NULLABLE", description = "Garmin primary benefit, e.g. AEROBIC_BASE, TEMPO" },
+    { name = "elapsed_seconds", type = "INTEGER", mode = "NULLABLE", description = "Total time incl. pauses (duration_seconds is moving time)" },
   ])
 }
 

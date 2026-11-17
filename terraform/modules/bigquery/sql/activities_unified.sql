@@ -1,6 +1,7 @@
 -- One row per real-world activity across all sources.
 -- Duplicate = another source has an activity starting within ±5 min whose
--- duration differs by at most 10%. The higher-priority source is kept
+-- moving OR elapsed duration differs by at most 10% (sources count moving time
+-- differently for strength, walks, swims...). The higher-priority source is kept
 -- (ties broken by source name); `also_in` lists where else it was found.
 WITH a AS (
   SELECT *, ${priority} AS _rank
@@ -15,8 +16,11 @@ pairs AS (
     ON x.source != y.source
    AND y.activity_date BETWEEN DATE_SUB(x.activity_date, INTERVAL 1 DAY) AND DATE_ADD(x.activity_date, INTERVAL 1 DAY)
    AND ABS(TIMESTAMP_DIFF(x.start_time, y.start_time, SECOND)) <= 300
-   AND ABS(IFNULL(x.duration_seconds, 0) - IFNULL(y.duration_seconds, 0))
-       <= 0.1 * GREATEST(IFNULL(x.duration_seconds, 0), IFNULL(y.duration_seconds, 0))
+   AND (
+         ABS(IFNULL(x.duration_seconds, 0) - IFNULL(y.duration_seconds, 0))
+           <= 0.1 * GREATEST(IFNULL(x.duration_seconds, 0), IFNULL(y.duration_seconds, 0))
+      OR ABS(x.elapsed_seconds - y.elapsed_seconds) <= 0.1 * GREATEST(x.elapsed_seconds, y.elapsed_seconds)
+   )
 ),
 agg AS (
   SELECT xs, xid, LOGICAL_OR(y_wins) AS beaten, ARRAY_AGG(DISTINCT ys ORDER BY ys) AS also_in
