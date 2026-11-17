@@ -118,7 +118,7 @@ gcloud config set project YOUR_PROJECT_ID     # billing must be enabled
    ```bash
    python3 scripts/setup.py config
    ```
-2. **Base infrastructure** (fresh install: delete `terraform/imports.tf` first — it is only for adopting an existing deployment):
+2. **Base infrastructure:**
    ```bash
    cd terraform
    terraform init -backend-config="bucket=YOUR_PROJECT_ID-tfstate"
@@ -174,5 +174,11 @@ gcloud run services logs read fitness-bot --region europe-west3 --limit=50
 ```
 
 - **Garmin 401/403 on token** — the key expired or was deleted: see “Rotate the key”.
-- **Bot silent** — it answers only `telegram_chat_id`; check the value, rejected chats are logged.
+- **Bot silent** — it answers only the chat in `telegram_chat_id`. Look for `отклонён чат <id>` in the bot logs; if that id is yours, store it and roll out a fresh revision (secrets are read at instance start):
+  ```bash
+  gcloud run services logs read fitness-bot --region europe-west3 --limit=50 | grep "отклонён чат"
+  python3 scripts/setup.py secrets --update telegram_chat_id
+  gcloud run services update fitness-bot --region europe-west3 --revision-suffix chatid-$(date +%s)
+  ```
+- **Roll back the bot** — `gcloud run revisions list --service fitness-bot --region europe-west3`, then `gcloud run services update-traffic fitness-bot --region europe-west3 --to-revisions REVISION=100`.
 - `/status` in the bot shows the last successful sync per source.
