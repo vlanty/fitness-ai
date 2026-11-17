@@ -1,16 +1,22 @@
 import logging
 import os
+import sys
+import traceback
 
 from fastapi import FastAPI, Request
 from telegram import Update
 from telegram.error import InvalidToken
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
+import log_safety
 from handlers import COMMANDS, cmd_start, on_menu_button, on_text, setup_menu
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 # httpx logs every request URL at INFO, and Telegram URLs contain the bot token.
 logging.getLogger("httpx").setLevel(logging.WARNING)
+# Safety net for everything else: strip secrets from every log line and traceback.
+log_safety.install()
+sys.excepthook = lambda *exc: sys.stderr.write(log_safety.redact("".join(traceback.format_exception(*exc))))
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
