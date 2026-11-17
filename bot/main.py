@@ -3,6 +3,7 @@ import os
 
 from fastapi import FastAPI, Request
 from telegram import Update
+from telegram.error import InvalidToken
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 from handlers import COMMANDS, cmd_start, on_menu_button, on_text, setup_menu
@@ -26,7 +27,12 @@ tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
 
 @app.on_event("startup")
 async def startup():
-    await tg.initialize()
+    try:
+        await tg.initialize()
+    except InvalidToken:
+        # python-telegram-bot puts the full token into this error; never let it reach the logs.
+        logger.error("Telegram rejected the bot token: check the latest version of secret telegram_bot_token")
+        raise RuntimeError("invalid Telegram bot token") from None
     try:
         await setup_menu(tg.bot)
     except Exception as e:  # noqa: BLE001 - a menu failure must not take the bot down
