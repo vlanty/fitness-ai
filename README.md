@@ -1,265 +1,147 @@
 # Fitness AI
 
-A self-hosted Telegram bot that collects your training data from **Strava** and **Garmin Connect**, stores it in **BigQuery**, and analyzes it using Claude AI — as a coach, sports doctor, and nutritionist.
+A self-hosted Telegram bot that collects your training and health data from the
+sources you choose (**Garmin Connect**, **Strava**, more can be added), stores it
+in **BigQuery**, and analyzes it with Claude as a coach, sports doctor and
+nutritionist.
 
-**Cost: ~$1–2/month** (Claude API only; everything else fits in GCP free tier)
+**Cost: ~$1–2/month** (Claude API; GCP usage fits the free tier).
 
 ## What you get
 
-- Daily automatic sync of activities, sleep, HRV, Body Battery, and daily stats
-- Telegram bot with AI-powered analysis on demand:
-  - `/coach` — training load, pace, progress toward your goal
-  - `/health` — HRV trends, resting HR, sleep quality, fatigue flags
-  - `/nutrition` — calorie targets, pre/post workout nutrition, hydration
-  - `/today` — last workout + yesterday's stats
+- Sync every few hours of activities and daily health (sleep, HRV, resting HR, stress, Body Battery, steps, VO2 max — depending on the source)
+- Telegram bot (answers only your chat):
+  - just ask — «как прошла последняя тренировка?», «как я спал вчера?»
+  - `/today` — last workout + latest day of health data
   - `/week` — current week summary
+  - `/coach`, `/health`, `/nutrition` — AI analysis
+  - `/status` — freshness of each data source
 
 ## Architecture
 
 ```
-Cloud Scheduler (cron 01:00 UTC)
+Cloud Scheduler (every 4 h)
         │
         ▼
-Cloud Run Job (collector)
-  ├── Strava API
-  └── Garmin Connect
+Cloud Run Job "collector" ── sources/garmin.py ── Garmin Personal API
+        │                └─ sources/strava.py ── Strava API
+        ├── raw files (.FIT) ──► GCS bucket <project>-fitness-raw
+        ▼
+BigQuery: activities, health_daily, ingest_state
+          views: activities_unified, health_daily_unified
         │
         ▼
-BigQuery (free tier)
-        │
-        ▼
-Cloud Run Service (Telegram bot)
-        └── Claude API (on demand)
+Cloud Run Service "bot" (Telegram webhook) ── Claude API
 ```
 
----
+## Data sources
 
-## Prerequisites
+You pick sources at setup (`data_sources` in `terraform.tfvars`). **Order = priority.**
 
-Make sure you have these installed on your machine:
+| Source | Data | Credentials |
+|---|---|---|
+| `garmin` | activities (+ original .FIT), sleep, HRV, stress, Body Battery, resting HR, steps, VO2 max | Personal API key |
+| `strava` | activities only | OAuth app + refresh token |
 
-- [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
-- [Terraform](https://developer.hashicorp.com/terraform/install)
-- [Docker](https://docs.docker.com/engine/install/)
-- Python 3.x (for the Strava auth script)
+### Several sources at once
 
----
+- Each source is pulled separately with its own cursor; one failing does not stop the others, but the job run is marked failed and the bot shows a warning.
+- Tables keep everything that arrived (`source` column, key `source + id/date`).
+- `activities_unified` removes duplicates: the same workout from two sources = start time within **±5 min** and duration within **10 %**. The row from the source listed first in `data_sources` is kept; `also_in` shows where else it was found. Sources no longer enabled (e.g. old Strava history) rank last but their unique workouts stay visible.
+- `health_daily_unified` takes each field per day from the highest-priority source that has it.
 
-## Step 1: Fork this repository
+### Garmin Connect (official Personal API)
 
-Click **Fork** on GitHub, then clone your fork:
+- Docs: [Personal API](https://developer.garmin.com/gc-developer-program/personal/personal-api/), [FAQ](https://developer.garmin.com/gc-developer-program/personal/personal-faq/).
+- Create a key at [connect.garmin.com → Personal API Token](https://connect.garmin.com/app/settings/personalApiToken). It is shown once; validity 30 / 90 / 180 days or 1 year; Garmin emails ~a week before expiry.
+- The collector exchanges the key for a 24-hour bearer token on every run (no refresh tokens exist).
+- **Limits:** Garmin does not publish rate limits. The collector paces requests (≥0.5 s apart), retries 429/5xx with exponential backoff (honours `Retry-After`), downloads at most `FIT_DOWNLOAD_LIMIT` (50) .FIT files per run and requests date ranges of ≤28 days.
+- **Not available / not confirmed:** recovery time, performance condition and training readiness are not part of the documented API. Run `scripts/garmin_probe.py` to see exactly which metrics and how much history your account returns.
+- Personal use only: the Personal API is for your own data, not for serving other users.
 
-```bash
-git clone https://github.com/YOUR_USERNAME/fitness-ai.git
-cd fitness-ai
-```
+**Rotate / re-issue the key** (expired, lost or leaked):
 
----
-
-## Step 2: Create a GCP project
-
-1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-2. Click the project dropdown → **New Project**
-3. Name it anything, e.g. `fitness-ai`
-4. Note your **Project ID** (e.g. `fitness-ai-123456`)
-
-Authenticate locally:
-
-```bash
-gcloud auth login
-gcloud auth application-default login
-gcloud config set project YOUR_PROJECT_ID
-```
-
-Enable billing on the project (required for Cloud Run and Scheduler — but you won't be charged; everything fits in free tier).
-
----
-
-## Step 3: Get your credentials
+1. On the Garmin page delete the old key (this also invalidates its tokens) and create a new one.
+2. `python3 scripts/setup.py secrets --update garmin_personal_api_key`
+3. Nothing else: the next collector run picks up the `latest` version.
 
 ### Strava
 
-1. Go to [strava.com/settings/api](https://www.strava.com/settings/api)
-2. Create an app (Website and Callback Domain: `localhost`)
-3. Note your **Client ID** and **Client Secret**
-4. Get your refresh token by running:
+1. [strava.com/settings/api](https://www.strava.com/settings/api): create an app (callback domain `localhost`).
+2. `python3 scripts/strava_auth.py` prints a refresh token.
+3. Enter Client ID, Client Secret and the refresh token in `setup.py secrets`.
+
+If Strava starts returning `400` on `/oauth/token`, the token was revoked: re-run `strava_auth.py` and `setup.py secrets --update strava_refresh_token`.
+
+## Setup
+
+Prerequisites: [Google Cloud CLI](https://cloud.google.com/sdk/docs/install), [Terraform ≥ 1.7](https://developer.hashicorp.com/terraform/install), [Docker](https://docs.docker.com/engine/install/), Python 3.10+.
 
 ```bash
-python3 -m venv ~/fitness-venv && source ~/fitness-venv/bin/activate
-pip install requests
-python scripts/strava_auth.py
+git clone https://github.com/YOUR_USERNAME/fitness-ai.git && cd fitness-ai
+gcloud auth login && gcloud auth application-default login
+gcloud config set project YOUR_PROJECT_ID     # billing must be enabled
 ```
 
-The script opens a browser, you approve access, it prints your refresh token.
+1. **Configure** — project, region, data sources, schedule; creates the state bucket:
+   ```bash
+   python3 scripts/setup.py config
+   ```
+2. **Base infrastructure** (fresh install: delete `terraform/imports.tf` first — it is only for adopting an existing deployment):
+   ```bash
+   cd terraform
+   terraform init -backend-config="bucket=YOUR_PROJECT_ID-tfstate"
+   terraform apply -target=google_project_service.apis -target=google_artifact_registry_repository.repo -target=module.secrets
+   ```
+3. **Secret values** (hidden input, sent straight to Secret Manager):
+   ```bash
+   python3 ../scripts/setup.py secrets
+   ```
+4. **Images and the rest:**
+   ```bash
+   REGION=europe-west3; BASE="${REGION}-docker.pkg.dev/$(gcloud config get-value project)/fitness-ai"
+   gcloud auth configure-docker ${REGION}-docker.pkg.dev
+   docker build --platform linux/amd64 -t ${BASE}/collector:latest ../collector && docker push ${BASE}/collector:latest
+   docker build --platform linux/amd64 -t ${BASE}/bot:latest ../bot && docker push ${BASE}/bot:latest
+   terraform apply
+   python3 ../scripts/setup.py webhook
+   ```
+5. **History** (optional, one-off):
+   ```bash
+   gcloud run jobs execute fitness-collector --region europe-west3 --update-env-vars BACKFILL_FROM=2024-01-01
+   ```
 
-### Garmin Connect
+Secret values never go into `terraform.tfvars` or Terraform state; Terraform only manages the secret containers.
 
-Just your Garmin account **email** and **password**. The collector logs in automatically each night.
-
-> **Note:** On first run Garmin may send a verification email. Log in manually at [connect.garmin.com](https://connect.garmin.com) to confirm, then retry.
-
-### Telegram Bot
-
-1. Open Telegram, find **@BotFather**
-2. Send `/newbot`, follow prompts, get your **bot token**
-3. Send any message to your new bot, then run:
+## Updating
 
 ```bash
-curl "https://api.telegram.org/botYOUR_TOKEN/getUpdates"
-```
-
-Find `"chat":{"id":XXXXXXXX}` in the response — that's your **chat ID**.
-
-### Anthropic API Key
-
-Get it at [console.anthropic.com](https://console.anthropic.com) → **API Keys**.
-
----
-
-## Step 4: Configure
-
-```bash
-cp terraform.tfvars.example terraform/terraform.tfvars
-```
-
-Edit `terraform/terraform.tfvars` and fill in all values:
-
-```hcl
-gcp_project_id       = "your-project-id"
-gcp_region           = "europe-west3"
-telegram_bot_token   = "..."
-telegram_chat_id     = "..."
-strava_client_id     = "..."
-strava_client_secret = "..."
-strava_refresh_token = "..."
-garmin_email         = "..."
-garmin_password      = "..."
-anthropic_api_key    = "sk-ant-..."
-sync_schedule        = "0 1 * * *"
-```
-
-> `terraform.tfvars` is in `.gitignore` — it will never be committed.
-
----
-
-## Step 5: Deploy
-
-### 5.1 Configure Docker for GCP
-
-```bash
-gcloud auth configure-docker YOUR_REGION-docker.pkg.dev
-```
-
-### 5.2 Bootstrap infrastructure (Artifact Registry first)
-
-```bash
-cd terraform
-terraform init
-terraform apply \
-  -target=google_project_service.apis \
-  -target=google_artifact_registry_repository.repo
-```
-
-### 5.3 Build and push Docker images
-
-```bash
-PROJECT=$(gcloud config get-value project)
-REGION="europe-west3"
-BASE="${REGION}-docker.pkg.dev/${PROJECT}/fitness-ai"
-
-docker build -t ${BASE}/collector:latest ./collector
-docker push ${BASE}/collector:latest
-
-docker build -t ${BASE}/bot:latest ./bot
-docker push ${BASE}/bot:latest
-```
-
-### 5.4 Deploy everything
-
-```bash
-terraform apply
-```
-
-Note the `bot_url` in the output.
-
-### 5.5 Register Telegram webhook
-
-```bash
-BOT_URL=$(terraform output -raw bot_url)
-curl "https://api.telegram.org/botYOUR_TOKEN/setWebhook?url=${BOT_URL}/webhook"
-# Should return: {"ok":true}
-```
-
----
-
-## Step 6: Initial historical sync
-
-On first run, load all your historical data:
-
-```bash
-gcloud run jobs execute fitness-collector \
-  --region europe-west3 \
-  --update-env-vars FULL_SYNC=true
-```
-
-This may take 5–30 minutes depending on how much data you have. After that, the cron job runs automatically every night at 01:00 UTC.
-
-Monitor progress:
-
-```bash
-gcloud run jobs executions logs \
-  $(gcloud run jobs executions list --job fitness-collector --region europe-west3 --format="value(name)" --limit=1) \
-  --region europe-west3
-```
-
----
-
-## Step 7: Use the bot
-
-Open Telegram and message your bot:
-
-| Command | Description |
-|---|---|
-| `/start` | Show all commands |
-| `/today` | Last workout + HRV + sleep + daily stats |
-| `/week` | All workouts this week |
-| `/coach` | AI analysis: training load, pace, recovery |
-| `/health` | AI analysis: HRV trend, sleep, Body Battery |
-| `/nutrition` | AI analysis: calorie targets, meal timing |
-
----
-
-## Updating code
-
-After making changes to collector or bot:
-
-```bash
-docker build -t ${BASE}/collector:latest ./collector && docker push ${BASE}/collector:latest
-docker build -t ${BASE}/bot:latest ./bot && docker push ${BASE}/bot:latest
-
-# Redeploy bot
+docker build --platform linux/amd64 -t ${BASE}/collector:latest ./collector && docker push ${BASE}/collector:latest
+docker build --platform linux/amd64 -t ${BASE}/bot:latest ./bot && docker push ${BASE}/bot:latest
 gcloud run services update fitness-bot --region europe-west3 --image ${BASE}/bot:latest
 ```
 
----
+The bot URL (and so the Telegram webhook) does not change between revisions. Roll back with
+`gcloud run services update-traffic fitness-bot --region europe-west3 --to-revisions PREVIOUS_REVISION=100`.
+
+Changing sources = edit `data_sources`, `terraform apply`, `setup.py secrets`. Secrets you no longer
+use go to `retired_secrets`: they are kept and labelled `status=retired`, never deleted.
+
+## Adding a data source
+
+1. `collector/sources/<name>.py`: subclass `Source`, set `name` and `required_env`, implement `fetch(start, end, known_ids) -> Batch` returning rows for `activities` / `health_daily` (see `sources/base.py`).
+2. Register it in `collector/sources/__init__.py`.
+3. Terraform: add its secrets to `local.source_secrets` (`terraform/main.tf`) and the name to the `data_sources` validation.
+4. `scripts/setup.py`: add it to `SOURCES` and its secrets to `SECRET_HELP`; document it above.
 
 ## Troubleshooting
 
-**Garmin login fails:**
-Log in manually at [connect.garmin.com](https://connect.garmin.com) to confirm any verification email, then retry.
-
-**Strava returns 401:**
-Refresh token was revoked. Re-run `scripts/strava_auth.py` and update the secret:
 ```bash
-echo -n "new_token" | gcloud secrets versions add strava_refresh_token --data-file=-
-```
-
-**Bot not responding:**
-```bash
+gcloud run jobs executions list --job fitness-collector --region europe-west3 --limit 5
+gcloud logging read 'resource.labels.job_name="fitness-collector" AND severity>=WARNING' --freshness=1d --limit 20
 gcloud run services logs read fitness-bot --region europe-west3 --limit=50
 ```
 
-**BigQuery tables missing:**
-```bash
-cd terraform && terraform apply
-```
+- **Garmin 401/403 on token** — the key expired or was deleted: see “Rotate the key”.
+- **Bot silent** — it answers only `telegram_chat_id`; check the value, rejected chats are logged.
+- `/status` in the bot shows the last successful sync per source.
