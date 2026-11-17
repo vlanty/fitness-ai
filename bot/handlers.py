@@ -2,6 +2,7 @@ import logging
 import os
 
 from telegram import BotCommand, BotCommandScopeChat, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 from telegram.helpers import escape_markdown
 
@@ -9,6 +10,7 @@ from bq_reader import BigQueryReader, stale_warnings
 from claude_client import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, NUTRITION_PROMPT, Refused, analyze
 from estimates import readiness, training_status
 from i18n import SUPPORTED, resolve, t
+from tg_format import html_to_plain, md_to_html, split_message
 
 logger = logging.getLogger(__name__)
 
@@ -262,12 +264,25 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ---------- AI ----------
 
+async def _send_ai_text(update: Update, markdown: str):
+    """Claude's Markdown -> Telegram HTML, split to fit; plain text if Telegram rejects the markup."""
+    for chunk in split_message(md_to_html(markdown)):
+        try:
+            await _reply(update, chunk, parse_mode="HTML")
+        except BadRequest as e:
+            logger.warning("HTML rejected by Telegram (%s), sending this part as plain text", e)
+            await _reply(update, html_to_plain(chunk))
+
+
 async def _ai_reply(update: Update, prompt: str, label: str, task: str, **fmt):
     lang = _lang(update)
     await _reply(update, t(lang, "ai.working", label=t(lang, f"ai.label.{label}")))
     try:
         result = analyze(prompt, _context(_bq()), task, lang, **fmt)
-        await _reply(update, result or t(lang, "ai.error"))
+        if not result:
+            await _reply(update, t(lang, "ai.error"))
+            return
+        await _send_ai_text(update, result)
     except Refused as e:
         logger.warning("Claude refused: %s", e)
         await _reply(update, t(lang, "ai.refused"))

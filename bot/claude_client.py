@@ -12,6 +12,12 @@ from models import effort_for, model_for, supports_fallback
 
 logger = logging.getLogger(__name__)
 
+# Answers are shown in Telegram: we convert this small Markdown subset to Telegram HTML.
+FORMAT_NOTE = """Formatting (the answer is shown in a Telegram chat):
+- Start each section with a short bold heading on its own line, like **Recovery**; no # headings.
+- Short paragraphs and "- " bullet lists; bold only key numbers or conclusions.
+- No tables, no code blocks, no horizontal rules."""
+
 GOAL_NOTE = ("The athlete has no specific race goal set: treat this as ongoing training "
              "(consistency, general fitness, staying healthy).")
 
@@ -21,6 +27,8 @@ Analyze the data concretely: what is good, what is bad, what to change. No fille
 
 Data:
 {data}
+
+{format}
 
 Answer in {language}, up to 400 words."""
 
@@ -37,6 +45,8 @@ If you see worrying patterns, say so directly.
 Data:
 {data}
 
+{format}
+
 Answer in {language}, up to 400 words."""
 
 NUTRITION_PROMPT = """You are a sports nutritionist. Give concrete recommendations with numbers:
@@ -48,6 +58,8 @@ NUTRITION_PROMPT = """You are a sports nutritionist. Give concrete recommendatio
 Training and load data:
 {data}
 
+{format}
+
 Answer in {language}, up to 400 words."""
 
 ASK_PROMPT = """You are the personal coach and sports physician of an amateur athlete. Answer their question using their data.
@@ -58,6 +70,8 @@ Question: {question}
 
 Data:
 {data}
+
+{format}
 
 Answer in {language}, to the point, up to 250 words."""
 
@@ -83,7 +97,7 @@ def analyze(prompt_template: str, data_summary: str, task: str, lang: str, **fmt
         max_tokens=16000,
         output_config={"effort": effort_for(task)},
         messages=[{"role": "user", "content": prompt_template.format(
-            data=data_summary, language=language_name(lang), goal=GOAL_NOTE, **fmt)}],
+            data=data_summary, language=language_name(lang), goal=GOAL_NOTE, format=FORMAT_NOTE, **fmt)}],
     )
     client = _get_client()
     if supports_fallback(model):
