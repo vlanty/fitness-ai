@@ -217,3 +217,8 @@ __pycache__/
 *.pyc
 .DS_Store
 terraform.tfvars
+
+# Garmin probe output (personal health data)
+garmin_probe_out/
+override.tf
+*_override.tf

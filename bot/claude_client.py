@@ -36,11 +36,22 @@ NUTRITION_PROMPT = """Ты спортивный нутрициолог. Даёш
 Ответ на русском, до 400 слов."""
 
 
-def analyze(prompt_template, data_summary, api_key):
+ASK_PROMPT = """Ты персональный тренер и спортивный врач спортсмена-любителя. Отвечай на вопрос по его данным.
+Опирайся только на данные ниже. Если нужных данных нет или они устарели — скажи об этом прямо, не выдумывай.
+
+Вопрос: {question}
+
+Данные:
+{data}
+
+Ответ на русском, по делу, до 250 слов."""
+
+
+def analyze(prompt_template, data_summary, api_key, **fmt):
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
         model="claude-sonnet-4-5",
         max_tokens=1000,
-        messages=[{"role": "user", "content": prompt_template.format(data=data_summary)}],
+        messages=[{"role": "user", "content": prompt_template.format(data=data_summary, **fmt)}],
     )
     return msg.content[0].text

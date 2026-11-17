@@ -7,46 +7,28 @@ variable "gcp_region" {
   default = "europe-west3"
 }
 
-variable "telegram_bot_token" {
-  type      = string
-  sensitive = true
+variable "data_sources" {
+  description = "Где брать данные. Порядок = приоритет при склейке дублей (первый главный)."
+  type        = list(string)
+  default     = ["garmin"]
+
+  validation {
+    condition     = length(var.data_sources) > 0 && alltrue([for s in var.data_sources : contains(["garmin", "strava"], s)])
+    error_message = "data_sources: непустой список из \"garmin\", \"strava\"."
+  }
 }
 
-variable "telegram_chat_id" {
-  type = string
-}
-
-variable "strava_client_id" {
-  type      = string
-  sensitive = true
-}
-
-variable "strava_client_secret" {
-  type      = string
-  sensitive = true
-}
-
-variable "strava_refresh_token" {
-  type      = string
-  sensitive = true
-}
-
-variable "garmin_email" {
-  type      = string
-  sensitive = true
-}
-
-variable "garmin_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "anthropic_api_key" {
-  type      = string
-  sensitive = true
+variable "retired_secrets" {
+  description = "Секреты, которые больше не используются: остаются в Secret Manager с меткой status=retired, не удаляются."
+  type        = list(string)
+  default     = []
 }
 
 variable "sync_schedule" {
-  type    = string
-  default = "0 1 * * *"
+  description = "Cron (UTC) запуска сборщика."
+  type        = string
+  default     = "15 */4 * * *"
 }
+
+# Secret values (Telegram, Anthropic, data-source keys) are not Terraform
+# variables: they live only in Secret Manager. See README / scripts/setup.py.

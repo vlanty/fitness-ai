@@ -2,8 +2,8 @@ import os
 import logging
 from fastapi import FastAPI, Request
 from telegram import Update
-from telegram.ext import Application, CommandHandler
-from handlers import cmd_start, cmd_today, cmd_week, cmd_coach, cmd_health, cmd_nutrition
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from handlers import cmd_start, cmd_today, cmd_week, cmd_coach, cmd_health, cmd_nutrition, cmd_status, on_text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -18,6 +18,8 @@ tg.add_handler(CommandHandler("week",      cmd_week))
 tg.add_handler(CommandHandler("coach",     cmd_coach))
 tg.add_handler(CommandHandler("health",    cmd_health))
 tg.add_handler(CommandHandler("nutrition", cmd_nutrition))
+tg.add_handler(CommandHandler("status",    cmd_status))
+tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
 
 @app.on_event("startup")
 async def startup():
