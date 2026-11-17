@@ -4,8 +4,7 @@ import pytest
 import requests
 
 from sources.base import PartialFetch
-from sources.garmin import (GarminApiError, GarminClient, GarminSource, body_battery_range, build_health,
-                            parse_activity, rows_by_date)
+from sources.garmin import GarminApiError, GarminClient, GarminSource, build_health, by_date, dig, parse_activity
 
 
 class Resp:
@@ -66,44 +65,46 @@ def test_pace_only_for_running():
     assert parse_activity({**ACT, "activityType": {"typeKey": "cycling"}})["avg_pace_sec_per_km"] is None
 
 
-def test_rows_by_date_finds_nested_daily_records():
-    payload = {"hrvSummaries": [{"calendarDate": "2026-11-15", "lastNightAvg": 50, "weeklyAvg": 55, "status": "BALANCED"},
-                                {"calendarDate": "2026-11-16", "lastNightAvg": 48}]}
-    rows = rows_by_date(payload)
-    assert rows["2026-11-15"]["lastnightavg"] == 50
-    assert rows["2026-11-16"]["lastnightavg"] == 48
-
-    stress = [{"calendarDate": "2026-11-16", "values": {"overallStressLevel": 31}}]
-    assert rows_by_date(stress)["2026-11-16"]["overallstresslevel"] == 31
-
-
-def test_body_battery_from_values_array():
-    flat = rows_by_date([{"date": "2026-11-16", "charged": 60, "drained": 55,
-                          "bodyBatteryValuesArray": [[1, 20], [2, 85], [3, 40]]}])["2026-11-16"]
-    assert body_battery_range(flat) == (85, 20)
+# Shapes copied from real Personal API responses (values are synthetic).
+SLEEP = [{"calendarDate": "2026-11-16", "sleepTimeSeconds": 27000, "deepSleepSeconds": 5400,
+          "lightSleepSeconds": 14000, "remSleepSeconds": 6000, "awakeSleepSeconds": 1600,
+          "sleepStartTimestampLocal": 1763247000000, "sleepEndTimestampLocal": 1763274000000,
+          "sleepScores": {"overall": {"value": 82, "qualifierKey": "GOOD"}}}]
+HRV = {"hrvSummaries": [{"calendarDate": "2026-11-16", "weeklyAvg": 55, "lastNightAvg": 50, "status": "BALANCED"}],
+       "userProfilePk": 1}
+SUMMARY = {"data": [{"calendarDate": "2026-11-16", "movement": {"steps": {"value": 9000, "goal": 8000}},
+                     "calories": {"burnedActive": 650}, "heartRate": {"restingValue": 47},
+                     "stress": {"avgLevel": 30}, "respiration": {"avgValue": 14},
+                     "bodyBattery": {"minValue": 20, "maxValue": 85, "chargedValue": 60, "drainedValue": 55}}]}
+VO2 = [{"generic": {"calendarDate": "2026-11-16", "vo2MaxPreciseValue": 51.7, "vo2MaxValue": 52.0}, "cycling": None}]
 
 
-def test_build_health_merges_endpoints_and_sleep():
-    parts = {
-        "hrv": {"lastnightavg": 50, "weeklyavg": 55, "status": "BALANCED"},
-        "daily_summary": {"restingheartrate": 47, "totalsteps": 9000},
-        "body_battery": rows_by_date([{"date": "2026-11-16", "bodyBatteryValuesArray": [[1, 20], [2, 85]]}])["2026-11-16"],
-        "stress": {"overallstresslevel": 30},
-        "vo2max": {}, 
-    }
-    sleep = {"dailySleepDTO": {"sleepTimeSeconds": 27000, "deepSleepSeconds": 5400, "remSleepSeconds": 6000,
-                               "sleepStartTimestampLocal": 1763331000000, "sleepScores": {"overall": {"value": 82}}}}
-    row = build_health("2026-11-16", parts, sleep)
-    assert row["hrv_last_night"] == 50 and row["hrv_status"] == "BALANCED"
-    assert row["resting_hr"] == 47 and row["steps"] == 9000 and row["stress_avg"] == 30
-    assert (row["body_battery_high"], row["body_battery_low"]) == (85, 20)
-    assert row["sleep_seconds"] == 27000 and row["sleep_score"] == 82
-    assert row["sleep_start"].startswith("2025-11-16T") or row["sleep_start"].startswith("2025-11-17T")
-    assert '"sleep"' in row["raw_json"]
+def test_dig_and_by_date():
+    assert dig(SUMMARY["data"][0], "heartRate.restingValue") == 47
+    assert dig({}, "a.b") is None
+    assert set(by_date(VO2, "generic.calendarDate")) == {"2026-11-16"}
+
+
+def test_build_health_from_real_shapes():
+    parts = {"sleep": SLEEP[0], "hrv": HRV["hrvSummaries"][0], "summary": SUMMARY["data"][0], "vo2max": VO2[0]}
+    row = build_health("2026-11-16", parts)
+    assert row["sleep_seconds"] == 27000 and row["sleep_score"] == 82 and row["deep_sleep_seconds"] == 5400
+    assert row["sleep_start"] == "2025-11-15T22:50:00"  # local wall time from Garmin's local epoch
+    assert (row["hrv_last_night"], row["hrv_weekly_avg"], row["hrv_status"]) == (50, 55, "BALANCED")
+    assert (row["resting_hr"], row["stress_avg"], row["steps"], row["active_calories"]) == (47, 30, 9000, 650)
+    assert (row["body_battery_low"], row["body_battery_high"]) == (20, 85)
+    assert row["respiration_avg"] == 14.0 and row["vo2max"] == 51.7
+    assert '"summary"' in row["raw_json"]
+
+
+def test_build_health_zero_sleep_is_no_sleep():
+    row = build_health("2026-11-16", {"sleep": {**SLEEP[0], "sleepTimeSeconds": 0, "sleepScores": {}},
+                                      "summary": SUMMARY["data"][0]})
+    assert row["sleep_seconds"] is None and row["steps"] == 9000
 
 
 def test_build_health_empty_day_is_skipped():
-    assert build_health("2026-11-16", {"hrv": {}, "stress": {}}, None) is None
+    assert build_health("2026-11-16", {"hrv": None, "summary": {}}) is None
 
 
 def test_client_refreshes_token_on_401_and_retries_429():
@@ -164,13 +165,28 @@ def test_activity_pagination():
     assert len(src._activities(date(2026, 1, 1), date(2026, 1, 28))) == 101
 
 
+def test_health_uses_four_range_calls():
+    routes = {
+        "/activitylist": lambda m, u, k: Resp(200, body=[]),
+        "/dailySleepSummariesByDate": lambda m, u, k: Resp(200, body=SLEEP),
+        "/hrv-service/hrv/daily/": lambda m, u, k: Resp(200, body=HRV),
+        "/dailysummaries": lambda m, u, k: Resp(200, body=SUMMARY),
+        "/maxmet/daily/": lambda m, u, k: Resp(200, body=VO2),
+    }
+    src = _source(routes)
+    batch = src.fetch(date(2026, 11, 15), date(2026, 11, 16), set())
+    assert [r["date"] for r in batch.health_daily] == ["2026-11-16"]
+    data_calls = [u for _, u, _ in src.client.s.log if "/token" not in u]
+    assert len(data_calls) == 5  # activity list + 4 health ranges, independent of window length
+
+
 def test_health_endpoint_failure_is_partial_not_silent():
     routes = {
         "/activitylist": lambda m, u, k: Resp(200, body=[]),
         "/hrv-service": lambda m, u, k: Resp(500),
-        "/dailySleep": lambda m, u, k: Resp(200, body={"dailySleepDTO": {"sleepTimeSeconds": 25000}}),
+        "/dailySleepSummariesByDate": lambda m, u, k: Resp(200, body=SLEEP),
     }
     src = _source(routes)
     with pytest.raises(PartialFetch) as e:
         src.fetch(date(2026, 11, 16), date(2026, 11, 16), set())
-    assert e.value.batch.health_daily[0]["sleep_seconds"] == 25000
+    assert e.value.batch.health_daily[0]["sleep_seconds"] == 27000

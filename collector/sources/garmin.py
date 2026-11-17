@@ -7,9 +7,8 @@ Docs: https://developer.garmin.com/gc-developer-program/personal/personal-api/
   * pull only. Rate limits are not documented: requests are paced and retried
     with exponential backoff on 429/5xx (Retry-After honoured).
 
-Field names below follow Garmin's JSON. Endpoints whose response shape is not
-documented are parsed defensively (by calendar date + candidate field names)
-and always kept verbatim in raw_json.
+Endpoints and field paths were verified against real responses
+(scripts/garmin_probe.py); raw responses are always kept in raw_json.
 """
 
 from __future__ import annotations
@@ -109,49 +108,23 @@ class GarminClient:
 
 
 # ---- parsing helpers --------------------------------------------------------
-def _flat(d: dict, prefix: str = "", out: dict | None = None) -> dict:
-    """Flatten nested dicts; keys reachable both by full path and by leaf name (lower-case)."""
-    out = {} if out is None else out
-    for k, v in d.items():
-        path = f"{prefix}.{k}" if prefix else str(k)
-        if isinstance(v, dict):
-            _flat(v, path, out)
-        else:
-            out.setdefault(path.lower(), v)
-            out.setdefault(str(k).lower(), v)
+def dig(obj, path: str):
+    """Value at a dotted path, or None (e.g. dig(x, "heartRate.restingValue"))."""
+    for part in path.split("."):
+        if not isinstance(obj, dict):
+            return None
+        obj = obj.get(part)
+    return obj
+
+
+def by_date(items, date_path: str = "calendarDate") -> dict[str, dict]:
+    """Index a list of per-day records by calendar date (YYYY-MM-DD)."""
+    out = {}
+    for it in items or []:
+        day = dig(it, date_path)
+        if isinstance(day, str) and len(day) >= 10:
+            out[day[:10]] = it
     return out
-
-
-def _pick(flat: dict, *names):
-    for n in names:
-        v = flat.get(n.lower())
-        if v is not None:
-            return v
-    return None
-
-
-DATE_KEYS = ("calendardate", "date", "summarydate")
-
-
-def rows_by_date(payload) -> dict[str, dict]:
-    """Find per-day records anywhere in a payload and merge them by calendar date."""
-    found: dict[str, dict] = {}
-
-    def walk(node):
-        if isinstance(node, dict):
-            flat = _flat(node)
-            day = next((str(flat[k])[:10] for k in DATE_KEYS if isinstance(flat.get(k), str)), None)
-            if day and len(day) == 10 and day[4] == "-":
-                found.setdefault(day, {}).update({k: v for k, v in flat.items() if v is not None})
-                return
-            for v in node.values():
-                walk(v)
-        elif isinstance(node, list):
-            for v in node:
-                walk(v)
-
-    walk(payload)
-    return found
 
 
 def _int(v):
@@ -208,82 +181,53 @@ def parse_activity(a: dict) -> dict:
     }
 
 
-def parse_sleep(raw) -> dict:
-    """/sleep-service/sleep/dailySleep -> sleep fields (shape: {dailySleepDTO: {...}, ...})."""
-    if not isinstance(raw, dict) or not raw.get("dailySleepDTO"):
-        return {}
-    dto = raw["dailySleepDTO"]
-    if not dto.get("sleepTimeSeconds"):
-        return {}
-    score = ((dto.get("sleepScores") or {}).get("overall") or {}).get("value")
-    return {
-        "sleep_start": _ts_local(dto.get("sleepStartTimestampLocal")),
-        "sleep_end": _ts_local(dto.get("sleepEndTimestampLocal")),
-        "sleep_seconds": _int(dto.get("sleepTimeSeconds")),
-        "deep_sleep_seconds": _int(dto.get("deepSleepSeconds")),
-        "light_sleep_seconds": _int(dto.get("lightSleepSeconds")),
-        "rem_sleep_seconds": _int(dto.get("remSleepSeconds")),
-        "awake_seconds": _int(dto.get("awakeSleepSeconds")),
-        "sleep_score": _int(score),
-        "spo2_avg": _float(raw.get("averageSpO2Value") or dto.get("averageSpO2Value")),
-        "respiration_avg": _float(raw.get("averageRespirationValue") or dto.get("averageRespirationValue")),
-    }
-
-
-def body_battery_range(flat: dict) -> tuple[int | None, int | None]:
-    """High/low from bodyBatteryValuesArray if explicit high/low fields are absent."""
-    arr = flat.get("bodybatteryvaluesarray")
-    if not isinstance(arr, list):
-        return None, None
-    idx = 1
-    desc = flat.get("bodybatteryvaluedescriptordtolist")
-    if isinstance(desc, list):
-        for d in desc:
-            if isinstance(d, dict) and "level" in str(d.get("bodyBatteryValueDescriptorKey", "")).lower():
-                idx = d.get("bodyBatteryValueDescriptorIndex", idx)
-    vals = [p[idx] for p in arr if isinstance(p, list) and len(p) > idx and isinstance(p[idx], (int, float))]
-    return (max(vals), min(vals)) if vals else (None, None)
-
-
-HEALTH_FIELDS = {
-    # column: candidate Garmin field names (leaf, case-insensitive), first hit wins
-    "hrv_last_night": ("lastNightAvg",),
-    "hrv_weekly_avg": ("weeklyAvg",),
-    "hrv_status": ("status",),
-    "resting_hr": ("restingHeartRate", "restingHR", "values.restingHR"),
-    "stress_avg": ("overallStressLevel", "averageStressLevel", "avgStressLevel"),
-    "body_battery_high": ("bodyBatteryHighestValue", "highestValue", "maxBodyBattery"),
-    "body_battery_low": ("bodyBatteryLowestValue", "lowestValue", "minBodyBattery"),
-    "body_battery_charged": ("charged", "bodyBatteryChargedValue"),
-    "body_battery_drained": ("drained", "bodyBatteryDrainedValue"),
-    "steps": ("totalSteps",),
-    "active_calories": ("activeKilocalories",),
-    "vo2max": ("vo2MaxPreciseValue", "vo2MaxValue"),
+# Health endpoints used per date window (4 requests), verified against real
+# responses (garmin_probe 2026-11-17):
+#   sleep   GET /sleep-service/sleep/dailySleepSummariesByDate  -> [ {calendarDate, ...} ]
+#   hrv     GET /hrv-service/hrv/daily/{start}/{end}           -> {hrvSummaries: [ {calendarDate, ...} ]}
+#   summary GET /usersummary-service/v2/dailysummaries          -> {data: [ {calendarDate, movement, heartRate, ...} ]}
+#   vo2max  GET /metrics-service/metrics/maxmet/daily/{s}/{e}   -> [ {generic: {calendarDate, ...}} ]
+# Not available as a daily value: SpO2 average, training readiness, training
+# status, recovery time (only inside undocumented .FIT message 140).
+HEALTH_MAP = {
+    # column: (endpoint, path, kind)
+    "sleep_start": ("sleep", "sleepStartTimestampLocal", "ts"),
+    "sleep_end": ("sleep", "sleepEndTimestampLocal", "ts"),
+    "sleep_seconds": ("sleep", "sleepTimeSeconds", "int"),
+    "deep_sleep_seconds": ("sleep", "deepSleepSeconds", "int"),
+    "light_sleep_seconds": ("sleep", "lightSleepSeconds", "int"),
+    "rem_sleep_seconds": ("sleep", "remSleepSeconds", "int"),
+    "awake_seconds": ("sleep", "awakeSleepSeconds", "int"),
+    "sleep_score": ("sleep", "sleepScores.overall.value", "int"),
+    "hrv_last_night": ("hrv", "lastNightAvg", "int"),
+    "hrv_weekly_avg": ("hrv", "weeklyAvg", "int"),
+    "hrv_status": ("hrv", "status", "str"),
+    "resting_hr": ("summary", "heartRate.restingValue", "int"),
+    "stress_avg": ("summary", "stress.avgLevel", "int"),
+    "body_battery_high": ("summary", "bodyBattery.maxValue", "int"),
+    "body_battery_low": ("summary", "bodyBattery.minValue", "int"),
+    "body_battery_charged": ("summary", "bodyBattery.chargedValue", "int"),
+    "body_battery_drained": ("summary", "bodyBattery.drainedValue", "int"),
+    "steps": ("summary", "movement.steps.value", "int"),
+    "active_calories": ("summary", "calories.burnedActive", "int"),
+    "respiration_avg": ("summary", "respiration.avgValue", "float"),
+    "vo2max": ("vo2max", "generic.vo2MaxPreciseValue", "float"),
 }
-INT_FIELDS = {"resting_hr", "stress_avg", "body_battery_high", "body_battery_low",
-              "body_battery_charged", "body_battery_drained", "steps", "active_calories",
-              "hrv_last_night", "hrv_weekly_avg"}
+CONVERT = {"int": lambda v: _int(v), "float": lambda v: _float(v), "ts": lambda v: _ts_local(v),
+           "str": lambda v: str(v) if v is not None else None}
 
 
-def build_health(day: str, parts: dict[str, dict], sleep_raw) -> dict | None:
-    """Merge per-endpoint per-day records into one health_daily row."""
+def build_health(day: str, parts: dict[str, dict]) -> dict | None:
+    """One health_daily row from the per-endpoint records of a single day."""
     row = {"source": "garmin", "date": day}
-    merged: dict = {}
-    for name in ("hrv", "stress", "body_battery", "daily_summary", "vo2max"):
-        merged.update({k: v for k, v in (parts.get(name) or {}).items() if k not in merged})
-    for col, names in HEALTH_FIELDS.items():
-        v = _pick(merged, *names)
-        row[col] = _int(v) if col in INT_FIELDS else (_float(v) if col == "vo2max" else v)
-    if row["body_battery_high"] is None:
-        hi, lo = body_battery_range(parts.get("body_battery") or {})
-        row["body_battery_high"], row["body_battery_low"] = _int(hi), _int(lo)
-    row.update(parse_sleep(sleep_raw))
-    payload = {k: v for k, v in parts.items() if v}
-    if sleep_raw:
-        payload["sleep"] = sleep_raw
-    if len(row) <= 2 or all(v is None for k, v in row.items() if k not in ("source", "date")):
+    for col, (endpoint, path, kind) in HEALTH_MAP.items():
+        row[col] = CONVERT[kind](dig(parts.get(endpoint) or {}, path))
+    if row["sleep_seconds"] == 0:  # Garmin reports 0 when no sleep was recorded
+        for col in ("sleep_start", "sleep_end", "sleep_seconds", "sleep_score"):
+            row[col] = None
+    if all(row[c] is None for c in HEALTH_MAP):
         return None
-    row["raw_json"] = to_json(payload)
+    row["raw_json"] = to_json({k: v for k, v in parts.items() if v})
     return row
 
 
@@ -313,21 +257,21 @@ class GarminSource(Source):
     def _health(self, start: date, end: date) -> list[dict]:
         s, e = start.isoformat(), end.isoformat()
         c = self.client
-        sources = {
-            "hrv": lambda: c.get_json(f"/hrv-service/hrv/daily/{s}/{e}"),
-            "stress": lambda: c.get_json(f"/usersummary-service/stats/stress/daily/{s}/{e}"),
-            "body_battery": lambda: c.get_json("/wellness-service/wellness/bodyBattery/reports/daily",
-                                               {"startDate": s, "endDate": e}),
-            "daily_summary": lambda: c.get_json("/usersummary-service/v2/dailysummaries",
-                                                {"startDate": s, "endDate": e}),
-            "vo2max": lambda: c.get_json(f"/metrics-service/metrics/maxmet/daily/{s}/{e}"),
+        calls = {
+            "sleep": lambda: by_date(c.get_json("/sleep-service/sleep/dailySleepSummariesByDate",
+                                                {"startDate": s, "endDate": e})),
+            "hrv": lambda: by_date((c.get_json(f"/hrv-service/hrv/daily/{s}/{e}") or {}).get("hrvSummaries")),
+            "summary": lambda: by_date((c.get_json("/usersummary-service/v2/dailysummaries",
+                                                   {"startDate": s, "endDate": e}) or {}).get("data")),
+            "vo2max": lambda: by_date(c.get_json(f"/metrics-service/metrics/maxmet/daily/{s}/{e}"),
+                                      "generic.calendarDate"),
         }
         by_endpoint: dict[str, dict[str, dict]] = {}
-        for name, call in sources.items():
+        for name, call in calls.items():
             try:
-                by_endpoint[name] = rows_by_date(call())
-            except GarminApiError as err:
-                # One health endpoint failing must not lose the others; surfaced as a failed run.
+                by_endpoint[name] = call()
+            except (GarminApiError, AttributeError, TypeError) as err:
+                # One endpoint failing must not lose the others; the run is still marked partial.
                 logger.error("garmin %s: %s", name, err)
                 self.partial_errors.append(f"{name}: {err}")
                 by_endpoint[name] = {}
@@ -335,13 +279,7 @@ class GarminSource(Source):
         rows, d = [], start
         while d <= end:
             day = d.isoformat()
-            try:
-                sleep_raw = c.get_json("/sleep-service/sleep/dailySleep", {"date": day})
-            except GarminApiError as err:
-                logger.error("garmin sleep %s: %s", day, err)
-                self.partial_errors.append(f"sleep {day}: {err}")
-                sleep_raw = None
-            row = build_health(day, {n: by_endpoint[n].get(day) or {} for n in by_endpoint}, sleep_raw)
+            row = build_health(day, {n: idx.get(day) for n, idx in by_endpoint.items()})
             if row:
                 rows.append(row)
             d += timedelta(days=1)

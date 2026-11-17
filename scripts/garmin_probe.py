@@ -258,7 +258,8 @@ def main() -> None:
     for metric in ("VO2 max (max_met_data)", "Aerobic training effect", "Anaerobic training effect",
                    "Сообщение 140 (recovery/perf. condition, недокументировано)"):
         v = fit_info.get(metric)
-        rows.append((f".FIT: {metric}", "есть" if v not in (None, False) else "нет", "" if v in (None, False, True) else str(v)))
+        present = v is not None and v is not False  # 0.0 is a real value (e.g. strength training TE)
+        rows.append((f".FIT: {metric}", "есть" if present else "нет", "" if v is None or isinstance(v, bool) else str(v)))
 
     print("\n================ ИТОГ ================")
     w = max(len(r[0]) for r in rows)

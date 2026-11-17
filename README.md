@@ -55,8 +55,23 @@ You pick sources at setup (`data_sources` in `terraform.tfvars`). **Order = prio
 - Docs: [Personal API](https://developer.garmin.com/gc-developer-program/personal/personal-api/), [FAQ](https://developer.garmin.com/gc-developer-program/personal/personal-faq/).
 - Create a key at [connect.garmin.com → Personal API Token](https://connect.garmin.com/app/settings/personalApiToken). It is shown once; validity 30 / 90 / 180 days or 1 year; Garmin emails ~a week before expiry.
 - The collector exchanges the key for a 24-hour bearer token on every run (no refresh tokens exist).
-- **Limits:** Garmin does not publish rate limits. The collector paces requests (≥0.5 s apart), retries 429/5xx with exponential backoff (honours `Retry-After`), downloads at most `FIT_DOWNLOAD_LIMIT` (50) .FIT files per run and requests date ranges of ≤28 days.
-- **Not available / not confirmed:** recovery time, performance condition and training readiness are not part of the documented API. Run `scripts/garmin_probe.py` to see exactly which metrics and how much history your account returns.
+- **Limits:** Garmin does not publish rate limits and sends no rate-limit headers; no 429 was seen while testing. The collector paces requests (≥0.5 s apart), retries 429/5xx with exponential backoff (honours `Retry-After`), downloads at most `FIT_DOWNLOAD_LIMIT` (50) .FIT files per run and reads health in 28-day ranges: one window = activity list + 4 health requests (+ .FIT downloads).
+- **History:** the API returns old data — activities and daily health from at least 25 months back were available when tested (as far back as the account has data).
+- **What you get** (checked with `scripts/garmin_probe.py`):
+
+  | Data | Available |
+  |---|---|
+  | Sleep: duration, phases, score, start/end | ✅ |
+  | HRV: last night, 7-day avg, status | ✅ |
+  | Resting HR, stress, Body Battery (min/max/charged/drained), steps, active calories, respiration | ✅ (daily summary) |
+  | VO2 max | ✅ on days Garmin recalculates it (health API; not in .FIT) |
+  | Activity: HR, pace, aerobic/anaerobic training effect, training load | ✅ |
+  | Original .FIT file | ✅ (ZIP) |
+  | Daily average SpO2 | ❌ |
+  | Training readiness, training status | ❌ (404) |
+  | Recovery time, performance condition | ❌ only inside undocumented .FIT message 140, not decoded |
+
+  Run `python3 scripts/garmin_probe.py` with your key to check your own account.
 - Personal use only: the Personal API is for your own data, not for serving other users.
 
 **Rotate / re-issue the key** (expired, lost or leaked):
