@@ -177,6 +177,7 @@ def parse_activity(a: dict) -> dict:
         "anaerobic_te": _float(a.get("anaerobicTrainingEffect")),
         "training_load": _float(a.get("activityTrainingLoad")),
         "vo2max": _float(a.get("vO2MaxValue")),
+        "training_effect_label": a.get("trainingEffectLabel"),
         "raw_json": to_json(a),
     }
 
@@ -202,6 +203,9 @@ HEALTH_MAP = {
     "hrv_last_night": ("hrv", "lastNightAvg", "int"),
     "hrv_weekly_avg": ("hrv", "weeklyAvg", "int"),
     "hrv_status": ("hrv", "status", "str"),
+    "hrv_5min_high": ("hrv", "lastNight5MinHigh", "int"),
+    "hrv_baseline_low": ("hrv", "baseline.balancedLow", "int"),     # Garmin's personal "balanced" range
+    "hrv_baseline_high": ("hrv", "baseline.balancedUpper", "int"),
     "resting_hr": ("summary", "heartRate.restingValue", "int"),
     "stress_avg": ("summary", "stress.avgLevel", "int"),
     "body_battery_high": ("summary", "bodyBattery.maxValue", "int"),

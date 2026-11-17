@@ -47,6 +47,7 @@ ACT = {
     "distance": 10000.0, "duration": 3100.0, "movingDuration": 3000.0, "elevationGain": 55.0,
     "averageHR": 150.4, "maxHR": 171, "calories": 700, "aerobicTrainingEffect": 3.4,
     "anaerobicTrainingEffect": 1.2, "activityTrainingLoad": 120.5, "vO2MaxValue": 52,
+    "trainingEffectLabel": "TEMPO",
 }
 
 
@@ -59,6 +60,7 @@ def test_parse_activity_uses_utc_start_local_date_and_moving_time():
     assert row["avg_heart_rate"] == 150
     assert (row["aerobic_te"], row["training_load"], row["vo2max"]) == (3.4, 120.5, 52.0)
     assert row["source"] == "garmin" and row["activity_id"] == "123"
+    assert row["training_effect_label"] == "TEMPO"
 
 
 def test_pace_only_for_running():
@@ -70,7 +72,8 @@ SLEEP = [{"calendarDate": "2026-11-16", "sleepTimeSeconds": 27000, "deepSleepSec
           "lightSleepSeconds": 14000, "remSleepSeconds": 6000, "awakeSleepSeconds": 1600,
           "sleepStartTimestampLocal": 1763247000000, "sleepEndTimestampLocal": 1763274000000,
           "sleepScores": {"overall": {"value": 82, "qualifierKey": "GOOD"}}}]
-HRV = {"hrvSummaries": [{"calendarDate": "2026-11-16", "weeklyAvg": 55, "lastNightAvg": 50, "status": "BALANCED"}],
+HRV = {"hrvSummaries": [{"calendarDate": "2026-11-16", "weeklyAvg": 55, "lastNightAvg": 50, "status": "BALANCED",
+                         "lastNight5MinHigh": 70, "baseline": {"balancedLow": 48, "balancedUpper": 62}}],
        "userProfilePk": 1}
 SUMMARY = {"data": [{"calendarDate": "2026-11-16", "movement": {"steps": {"value": 9000, "goal": 8000}},
                      "calories": {"burnedActive": 650}, "heartRate": {"restingValue": 47},
@@ -91,6 +94,7 @@ def test_build_health_from_real_shapes():
     assert row["sleep_seconds"] == 27000 and row["sleep_score"] == 82 and row["deep_sleep_seconds"] == 5400
     assert row["sleep_start"] == "2025-11-15T22:50:00"  # local wall time from Garmin's local epoch
     assert (row["hrv_last_night"], row["hrv_weekly_avg"], row["hrv_status"]) == (50, 55, "BALANCED")
+    assert (row["hrv_5min_high"], row["hrv_baseline_low"], row["hrv_baseline_high"]) == (70, 48, 62)
     assert (row["resting_hr"], row["stress_avg"], row["steps"], row["active_calories"]) == (47, 30, 9000, 650)
     assert (row["body_battery_low"], row["body_battery_high"]) == (20, 85)
     assert row["respiration_avg"] == 14.0 and row["vo2max"] == 51.7

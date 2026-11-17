@@ -12,7 +12,7 @@ locals {
   health_fields = [
     "sleep_start", "sleep_end", "sleep_seconds", "deep_sleep_seconds", "light_sleep_seconds",
     "rem_sleep_seconds", "awake_seconds", "sleep_score",
-    "hrv_last_night", "hrv_weekly_avg", "hrv_status",
+    "hrv_last_night", "hrv_weekly_avg", "hrv_status", "hrv_5min_high", "hrv_baseline_low", "hrv_baseline_high",
     "resting_hr", "stress_avg",
     "body_battery_high", "body_battery_low", "body_battery_charged", "body_battery_drained",
     "steps", "active_calories", "spo2_avg", "respiration_avg", "vo2max",
@@ -52,6 +52,7 @@ resource "google_bigquery_table" "activities" {
     { name = "vo2max", type = "FLOAT", mode = "NULLABLE" },
     { name = "raw_file", type = "STRING", mode = "NULLABLE", description = "Object path in the raw bucket (.FIT zip)" },
     { name = "ingested_at", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "training_effect_label", type = "STRING", mode = "NULLABLE", description = "Garmin primary benefit, e.g. AEROBIC_BASE, TEMPO" },
   ])
 }
 
@@ -93,6 +94,9 @@ resource "google_bigquery_table" "health_daily" {
     { name = "vo2max", type = "FLOAT", mode = "NULLABLE" },
     { name = "raw_json", type = "STRING", mode = "NULLABLE" },
     { name = "ingested_at", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "hrv_5min_high", type = "INTEGER", mode = "NULLABLE" },
+    { name = "hrv_baseline_low", type = "INTEGER", mode = "NULLABLE", description = "Garmin personal balanced range, low" },
+    { name = "hrv_baseline_high", type = "INTEGER", mode = "NULLABLE", description = "Garmin personal balanced range, high" },
   ])
 }
 
@@ -137,6 +141,20 @@ resource "google_bigquery_table" "health_daily_unified" {
       table    = "${var.project_id}.${google_bigquery_dataset.fitness.dataset_id}.${google_bigquery_table.health_daily.table_id}"
       priority = local.priority_sql
       fields   = local.health_fields
+    })
+  }
+}
+
+resource "google_bigquery_table" "training_load_daily" {
+  dataset_id          = google_bigquery_dataset.fitness.dataset_id
+  table_id            = "training_load_daily"
+  deletion_protection = false
+
+  view {
+    use_legacy_sql = false
+    query = templatefile("${path.module}/sql/training_load_daily.sql", {
+      activities = "${var.project_id}.${google_bigquery_dataset.fitness.dataset_id}.${google_bigquery_table.activities_unified.table_id}"
+      health     = "${var.project_id}.${google_bigquery_dataset.fitness.dataset_id}.${google_bigquery_table.health_daily_unified.table_id}"
     })
   }
 }

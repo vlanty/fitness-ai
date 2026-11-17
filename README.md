@@ -72,6 +72,22 @@ You pick sources at setup (`data_sources` in `terraform.tfvars`). **Order = prio
   | Recovery time, performance condition | ❌ only inside undocumented .FIT message 140, not decoded |
 
   Run `python3 scripts/garmin_probe.py` with your key to check your own account.
+
+### Training load and estimates (computed by fitness-ai)
+
+Garmin's readiness / status models are closed, but their inputs are documented and the
+heavy part — per-activity EPOC load and training effect — comes from Garmin itself.
+
+- View `training_load_daily`: acute load (7-day sum of `training_load`), chronic load
+  (weekly average over 28 days), load ratio with Garmin's bands (< 0.8 low, 0.8–1.4 optimal,
+  above high), 28-day load focus (low aerobic / high aerobic / anaerobic from
+  `trainingEffectLabel`), VO2 max and its 28-day change.
+- HRV personal range (`hrv_baseline_low/high`) from Garmin's HRV baseline.
+- Bot shows **readiness** (0–100) and **training status** as *fitness-ai estimates, not Garmin
+  values* — transparent rules in `bot/estimates.py` over the same inputs Garmin lists
+  (readiness: sleep score, 3-night sleep, HRV vs baseline, load ratio, 3-day stress — without
+  recovery time; status: VO2 max trend, load ratio, HRV status).
+- Recovery time and performance condition are not estimated.
 - Personal use only: the Personal API is for your own data, not for serving other users.
 
 **Rotate / re-issue the key** (expired, lost or leaked):

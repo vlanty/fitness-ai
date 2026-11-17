@@ -38,6 +38,11 @@ class BigQueryReader:
                        "WHERE date >= @since ORDER BY date",
                        since=date.today() - timedelta(days=days))
 
+    def get_load_last_days(self, days: int = 1) -> list[dict]:
+        return self._q(f"SELECT * FROM `{self.prefix}.training_load_daily` "
+                       "WHERE date > @since ORDER BY date",
+                       since=date.today() - timedelta(days=days))
+
     def get_source_status(self) -> list[dict]:
         return self._q(f"SELECT source, cursor_date, last_success_at, last_status, last_error "
                        f"FROM `{self.prefix}.ingest_state` ORDER BY source")
