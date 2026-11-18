@@ -5,17 +5,21 @@ sources you choose (**Garmin Connect**, **Strava**, more can be added), stores i
 in **BigQuery**, and analyzes it with Claude as a coach, sports doctor and
 nutritionist.
 
-**Cost: ~$1–2/month** (Claude API; GCP usage fits the free tier).
+**Cost: ~$1–2/month** for typical use. GCP usage fits the free tier; you pay for Claude
+API calls only — one question to the bot is about 4k input + 0.7k output tokens on
+Claude Sonnet 5.5, roughly $0.015.
 
 ## What you get
 
 - Sync every few hours of activities and daily health (sleep, HRV, resting HR, stress, Body Battery, steps, VO2 max — depending on the source)
-- Telegram bot (answers only your chat):
-  - just ask — «как прошла последняя тренировка?», «как я спал вчера?»
+- Telegram bot (answers only your chat) in **Russian or English**:
+  - just ask in any language — "how did my last workout go?", «как я спал вчера?» — the answer comes in the language of the question
+  - `/menu` (or `/start`) — buttons for everything below; the same commands are in Telegram's **Menu** list
   - `/today` — last workout, latest health day, training load, readiness and training status (fitness-ai estimates)
   - `/week` — current week summary
   - `/coach`, `/health`, `/nutrition` — AI analysis
   - `/status` — freshness of each data source
+- AI answers are formatted for Telegram: bold section headings, bullet lists, long answers split into several messages
 - Training load from Garmin's per-activity EPOC: acute / chronic load, load ratio, load focus, VO2 max trend
 - Full history on first install (`BACKFILL_FROM`), several sources merged without duplicates
 
@@ -40,7 +44,9 @@ BigQuery dataset "fitness"
         ▼
 Cloud Run Service "bot" (Telegram webhook, owner chat only)
         ├── bot/estimates.py ── readiness & training status (our estimates)
-        └── Claude API
+        ├── bot/locales/    ── texts in ru / en
+        ├── bot/models.py   ── which Claude model does which task
+        └── Claude API      (Sonnet 5.5 for questions and analysis, Haiku 5.5 for routine messages)
 
 Secrets: Secret Manager (values never in Terraform)   State: GCS bucket <project>-tfstate
 ```
@@ -115,6 +121,22 @@ heavy part — per-activity EPOC load and training effect — comes from Garmin 
 
 If Strava starts returning `400` on `/oauth/token`, the token was revoked: re-run `strava_auth.py` and `setup.py secrets --update strava_refresh_token`.
 
+## Bot settings
+
+Optional, in `terraform/terraform.tfvars`, then `terraform apply`:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `bot_language` | `""` | Language of menus, buttons and commands: `ru` or `en`. Empty = each user's Telegram app language (English if it's neither). Free-form answers always follow the language of the question. |
+| `bot_models` | `{}` | Claude model per task, e.g. `{ chat = "claude-opus-5-5" }`. Tasks: `chat` (free-form questions), `analysis` (`/coach` `/health` `/nutrition`) — default `claude-sonnet-5-5`; `weekly`, `alerts`, `morning` (planned routine messages) — default `claude-haiku-5-5`. |
+
+Model names are never shown to bot users. To add a language, copy `bot/locales/en.json`
+to `<code>.json`, translate the values and keep the keys.
+
+**Secrets in logs.** The bot never writes the Telegram token or the Anthropic key to the
+logs: request URLs are not logged, and `bot/log_safety.py` masks anything token-shaped in
+every log line and traceback.
+
 ## Setup
 
 Prerequisites: [Google Cloud CLI](https://cloud.google.com/sdk/docs/install), [Terraform ≥ 1.7](https://developer.hashicorp.com/terraform/install), [Docker](https://docs.docker.com/engine/install/), Python 3.10+.
@@ -185,11 +207,19 @@ gcloud run services logs read fitness-bot --region europe-west3 --limit=50
 ```
 
 - **Garmin 401/403 on token** — the key expired or was deleted: see “Rotate the key”.
-- **Bot silent** — it answers only the chat in `telegram_chat_id`. Look for `отклонён чат <id>` in the bot logs; if that id is yours, store it and roll out a fresh revision (secrets are read at instance start):
+- **Bot silent, no `POST /webhook` in its logs** — Telegram is not delivering. Run `python3 scripts/setup.py webhook`; this is needed after every token rotation (below), because Telegram drops the webhook when a token is revoked.
+- **Bot silent, `rejected chat <id>` in its logs** — it answers only the chat in `telegram_chat_id`. If that id is yours, store it and roll out a fresh revision (secrets are read at instance start):
   ```bash
-  gcloud run services logs read fitness-bot --region europe-west3 --limit=50 | grep "отклонён чат"
+  gcloud run services logs read fitness-bot --region europe-west3 --limit=50 | grep "rejected chat"
   python3 scripts/setup.py secrets --update telegram_chat_id
   gcloud run services update fitness-bot --region europe-west3 --revision-suffix chatid-$(date +%s)
   ```
+- **Rotate the Telegram bot token** (leaked or lost) — copy the whole new token, digits before the colon included:
+  1. @BotFather → `/revoke` → choose the bot → new token.
+  2. `python3 scripts/setup.py secrets --update telegram_bot_token`, then disable the old version: `gcloud secrets versions disable OLD_VERSION --secret telegram_bot_token`.
+  3. `gcloud run services update fitness-bot --region europe-west3 --revision-suffix token-$(date +%s)` — new instances read the new token.
+  4. `python3 scripts/setup.py webhook` — revoking the token removed the webhook.
+
+  If the bot fails to start with `Telegram rejected the bot token`, the stored value is wrong (often a digit lost when pasting): store it again and repeat step 3.
 - **Roll back the bot** — `gcloud run revisions list --service fitness-bot --region europe-west3`, then `gcloud run services update-traffic fitness-bot --region europe-west3 --to-revisions REVISION=100`.
 - `/status` in the bot shows the last successful sync per source.
