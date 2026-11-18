@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="docs/avatar.png" alt="Fitness AI" width="200">
+  <img src="docs/avatar.png" alt="Vita, the Second Wind bot" width="200">
 </p>
 
-# Fitness AI
+# Second Wind
 
-A self-hosted Telegram bot that collects your training and health data from the
+*Второе дыхание.* A self-hosted Telegram bot, **Vita** (Вита), that collects your training and health data from the
 sources you choose (**Garmin Connect**, **Strava**, more can be added), stores it
 in **BigQuery**, and analyzes it with Claude as a coach, sports doctor and
 nutritionist.
@@ -19,7 +19,8 @@ Claude Sonnet 5.5, roughly $0.015.
 - Telegram bot (answers only your chat) in **Russian or English**:
   - just ask in any language — "how did my last workout go?", «как я спал вчера?» — the answer comes in the language of the question
   - `/menu` (or `/start`) — buttons for everything below; the same commands are in Telegram's **Menu** list
-  - `/today` — last workout, latest health day, training load, readiness and training status (fitness-ai estimates)
+  - the bot's name follows the Telegram app language: **Вита · Второе дыхание** in Russian, **Vita · Second Wind** otherwise (set by the bot itself on start, no BotFather step)
+  - `/today` — last workout, latest health day, training load, readiness and training status (our own estimates)
   - `/week` — current week summary
   - `/coach`, `/health`, `/nutrition` — AI analysis
   - `/status` — freshness of each data source
@@ -28,6 +29,9 @@ Claude Sonnet 5.5, roughly $0.015.
 - Full history on first install (`BACKFILL_FROM`), several sources merged without duplicates
 
 ## Architecture
+
+Cloud resources keep the short technical prefix `fitness-` (`fitness-bot`, `fitness-collector`,
+dataset `fitness`), so existing installs update in place without recreating anything.
 
 ```
 Cloud Scheduler (every 4 h)
@@ -94,7 +98,7 @@ You pick sources at setup (`data_sources` in `terraform.tfvars`). **Order = prio
 
   Run `python3 scripts/garmin_probe.py` with your key to check your own account.
 
-### Training load and estimates (computed by fitness-ai)
+### Training load and estimates (computed by Second Wind)
 
 Garmin's readiness / status models are closed, but their inputs are documented and the
 heavy part — per-activity EPOC load and training effect — comes from Garmin itself.
@@ -104,7 +108,7 @@ heavy part — per-activity EPOC load and training effect — comes from Garmin 
   above high), 28-day load focus (low aerobic / high aerobic / anaerobic from
   `trainingEffectLabel`), VO2 max and its 28-day change.
 - HRV personal range (`hrv_baseline_low/high`) from Garmin's HRV baseline.
-- Bot shows **readiness** (0–100) and **training status** as *fitness-ai estimates, not Garmin
+- Bot shows **readiness** (0–100) and **training status** as *our own estimates, not Garmin
   values* — transparent rules in `bot/estimates.py` over the same inputs Garmin lists
   (readiness: sleep score, 3-night sleep, HRV vs baseline, load ratio, 3-day stress — without
   recovery time; status: VO2 max trend, load ratio, HRV status).
@@ -146,7 +150,7 @@ every log line and traceback.
 Prerequisites: [Google Cloud CLI](https://cloud.google.com/sdk/docs/install), [Terraform ≥ 1.7](https://developer.hashicorp.com/terraform/install), [Docker](https://docs.docker.com/engine/install/), Python 3.10+.
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/fitness-ai.git && cd fitness-ai
+git clone https://github.com/YOUR_USERNAME/second-wind.git && cd second-wind
 gcloud auth login && gcloud auth application-default login
 gcloud config set project YOUR_PROJECT_ID     # billing must be enabled
 ```

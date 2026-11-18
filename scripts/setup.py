@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive setup for Fitness AI. Standard library only; needs gcloud + terraform.
+"""Interactive setup for Second Wind. Standard library only; needs gcloud + terraform.
 
   python3 scripts/setup.py config    # choose project, region, data sources -> terraform/terraform.tfvars,
                                      # create the Terraform state bucket

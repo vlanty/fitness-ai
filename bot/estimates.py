@@ -1,4 +1,4 @@
-"""fitness-ai's own estimates of readiness and training status.
+"""Second Wind's own estimates of readiness and training status.
 
 Garmin computes Training Readiness and Training Status with closed Firstbeat
 models and the Personal API does not return them. Garmin documents only the

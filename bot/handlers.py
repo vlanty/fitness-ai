@@ -183,8 +183,8 @@ def _context(bq: BigQueryReader) -> str:
         "=== WORKOUTS: LAST WEEK ===\n" + ("\n\n".join(_fmt_activity(a, lang) for a in prev) or "none") + "\n\n"
         "=== HEALTH BY DAY (14 days: sleep, HRV, resting HR, stress, Body Battery) ===\n"
         + ("\n".join(_fmt_health(h, lang) for h in health) or "no data") + "\n\n"
-        "=== TRAINING LOAD (computed by fitness-ai from Garmin data) ===\n" + _fmt_load(load, lang) + "\n\n"
-        "=== fitness-ai ESTIMATES (NOT Garmin metrics; call them our estimate) ===\n"
+        "=== TRAINING LOAD (computed by Second Wind from Garmin data) ===\n" + _fmt_load(load, lang) + "\n\n"
+        "=== SECOND WIND ESTIMATES (NOT Garmin metrics; call them our estimate) ===\n"
         + _estimates(health, load, lang) + "\n\n"
         + ("=== DATA FRESHNESS ===\n" + "\n".join(warn) if warn else "")
     )
@@ -228,6 +228,20 @@ async def setup_menu(bot) -> None:
         commands = [BotCommand(c, t(shown, f"cmd.{c}")) for c in MENU_COMMANDS]
         # The English list (no language_code) is also the fallback for any other Telegram language.
         await bot.set_my_commands(commands, scope=scope, language_code=None if lang == "en" else lang)
+    await _set_names(bot)
+
+
+async def _set_names(bot) -> None:
+    """Bot display name per Telegram language (e.g. "Вита · Второе дыхание"); English is the fallback.
+    Only changed when different: setMyName is strictly rate-limited."""
+    for lang in SUPPORTED:
+        code = None if lang == "en" else lang
+        name = t(lang, "bot.name")
+        try:
+            if (await bot.get_my_name(language_code=code)).name != name:
+                await bot.set_my_name(name, language_code=code)
+        except Exception as e:  # noqa: BLE001 - a name is cosmetic; never break startup over it
+            logger.warning("bot name for %s not set: %s", lang, e)
 
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
