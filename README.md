@@ -151,6 +151,12 @@ heavy part — per-activity EPOC load and training effect — comes from Garmin 
   (readiness: sleep score, 3-night sleep, HRV vs baseline, load ratio, 3-day stress — without
   recovery time; status: VO2 max trend, load ratio, HRV status).
 - Recovery time and performance condition are not estimated.
+- **Heart-rate zones** are the ones your watch uses: the collector reads them from each new
+  .FIT file (`time_in_zone`: zone bounds, method — % of lactate threshold / max HR / HR
+  reserve — and the threshold HR), so the bot's zones match the watch and Garmin's time in
+  zone. Without them (e.g. Strava only) the bot falls back to the threshold from `/profile`
+  (Friel), then Karvonen (resting HR from Garmin's 7-day average), then % of max HR.
+  `/profile` also shows how the threshold on the watch changed over ~3 months.
 - Personal use only: the Personal API is for your own data, not for serving other users.
 
 **Rotate / re-issue the key** (expired, lost or leaked):
@@ -233,6 +239,10 @@ gcloud run services update fitness-bot --region europe-west3 --image ${BASE}/bot
 
 The bot URL (and so the Telegram webhook) does not change between revisions. Roll back with
 `gcloud run services update-traffic fitness-bot --region europe-west3 --to-revisions PREVIOUS_REVISION=100`.
+
+Activities stored before the collector learned to read HR zones from .FIT files get them with a
+one-off, re-runnable script (it reads the archives already in the raw bucket):
+`python3 scripts/backfill_fit_zones.py --project YOUR_PROJECT_ID` (add `--dry-run` to only look).
 
 Changing sources = edit `data_sources`, `terraform apply`, `setup.py secrets`. Secrets you no longer
 use go to `retired_secrets`: they are kept and labelled `status=retired`, never deleted.

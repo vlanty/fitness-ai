@@ -10,6 +10,8 @@ from google.cloud import bigquery
 from i18n import t
 
 STALE_AFTER = timedelta(hours=26)
+# Garmin keeps separate HR zones per sport; running ones go first.
+RUN_FIRST = "IFNULL(type, '') LIKE '%running%'"
 
 
 class BigQueryReader:
@@ -44,6 +46,29 @@ class BigQueryReader:
         return self._q(f"SELECT * FROM `{self.prefix}.training_load_daily` "
                        "WHERE date > @since ORDER BY date",
                        since=date.today() - timedelta(days=days))
+
+    def get_athlete_inputs(self) -> dict:
+        """Watch HR zones from the latest .FIT, the threshold ~90 days earlier, and Garmin's
+        7-day resting HR. Missing parts are None (e.g. Strava-only installs have no zones).
+        Garmin keeps zones per sport: running zones are preferred (the coach is a running coach),
+        any other activity's zones are the fallback."""
+        rows = self._q(f"""
+            WITH z AS (
+              SELECT activity_date AS zones_date, type AS zones_type, hr_zone_calc, hr_zone_bounds, lthr
+              FROM `{self.prefix}.activities`
+              WHERE hr_zone_bounds IS NOT NULL
+              ORDER BY {RUN_FIRST} DESC, start_time DESC LIMIT 1),
+            old AS (
+              SELECT lthr AS lthr_then, activity_date AS lthr_then_date
+              FROM `{self.prefix}.activities`
+              WHERE lthr IS NOT NULL AND activity_date <= DATE_SUB(@today, INTERVAL 30 DAY)
+              ORDER BY {RUN_FIRST} DESC, ABS(DATE_DIFF(activity_date, DATE_SUB(@today, INTERVAL 90 DAY), DAY)) LIMIT 1),
+            r AS (
+              SELECT CAST(ROUND(AVG(resting_hr)) AS INT64) AS resting_hr_7d
+              FROM `{self.prefix}.health_daily_unified`
+              WHERE date > DATE_SUB(@today, INTERVAL 7 DAY) AND resting_hr IS NOT NULL)
+            SELECT * FROM r LEFT JOIN z ON TRUE LEFT JOIN old ON TRUE""", today=date.today())
+        return rows[0] if rows else {}
 
     def get_source_status(self) -> list[dict]:
         return self._q(f"SELECT source, cursor_date, last_success_at, last_status, last_error "

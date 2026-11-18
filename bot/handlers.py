@@ -10,7 +10,7 @@ from telegram.helpers import escape_markdown
 
 from bq_reader import BigQueryReader, stale_warnings
 from claude_client import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, NUTRITION_PROMPT, Refused, analyze
-from athlete import DISTANCES, PROFILE_FIELDS, athlete_note
+from athlete import DISTANCES, PROFILE_FIELDS, athlete_note, compute_zones
 from estimates import readiness, training_status
 from i18n import SUPPORTED, resolve, t
 from models import DEFAULT_MODE
@@ -296,6 +296,15 @@ async def _stored(update: Update, lang: str, action) -> bool:
         return False
 
 
+def _athlete_inputs() -> dict:
+    """Watch zones, threshold trend and Garmin resting HR; {} if BigQuery can't answer."""
+    try:
+        return _bq().get_athlete_inputs()
+    except Exception as e:  # noqa: BLE001
+        logger.error("athlete inputs read failed: %s", e)
+        return {}
+
+
 def _month() -> str:
     return date.today().strftime("%Y-%m")
 
@@ -326,7 +335,8 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE, edit: bool
     if not await _guard(update):
         return
     user = _user(update)
-    await _show(update, *render_profile(_lang(update, user), user.get("profile") or {}), edit=edit)
+    await _show(update, *render_profile(_lang(update, user), user.get("profile") or {}, _athlete_inputs()),
+                edit=edit)
 
 
 async def _on_profile_button(update: Update, rest: str):
@@ -464,7 +474,13 @@ async def _ai_reply(update: Update, prompt: str, label: str, task: str, **fmt):
     except Exception as e:  # noqa: BLE001
         logger.error("goal read failed: %s", e)
         goal = None
-    athlete = athlete_note(user.get("profile") or {}, goal, date.today())
+    profile = user.get("profile") or {}
+    inputs = _athlete_inputs()
+    lthr_then = ((inputs["lthr_then"], str(inputs["lthr_then_date"]))
+                 if inputs.get("lthr_then") and inputs.get("lthr_then_date") else None)
+    athlete = athlete_note(profile, goal, date.today(),
+                           zones=compute_zones(profile, inputs, inputs.get("resting_hr_7d")),
+                           garmin_resting_hr=inputs.get("resting_hr_7d"), lthr_then=lthr_then)
     await _reply(update, t(lang, "ai.working", label=t(lang, f"ai.label.{label}")))
     try:
         answer = analyze(prompt, _context(_bq()), task, lang, mode=mode, athlete=athlete, **fmt)
@@ -505,7 +521,9 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if pending:
         lang = _lang(update, user)
         try:
-            text, kb = handle_input(_store(), _chat_id(update), lang, pending, update.message.text, date.today())
+            watch = _athlete_inputs() if pending.get("kind") == "profile" else None
+            text, kb = handle_input(_store(), _chat_id(update), lang, pending, update.message.text, date.today(),
+                                    watch)
         except Exception as e:  # noqa: BLE001
             logger.error("input handling failed: %s", e)
             await _reply(update, t(lang, "storage.error"))

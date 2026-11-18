@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import date, timedelta
 
 # field -> (min, max, kind); kind "int" | "float" | "text"
@@ -11,6 +12,7 @@ PROFILE_FIELDS = {
     "weight_kg": (30, 250, "float"),
     "max_hr": (120, 230, "int"),
     "resting_hr": (30, 100, "int"),
+    "lthr": (120, 210, "int"),       # lactate threshold HR, used when the watch's zones are unknown
     "injuries": (0, 300, "text"),
 }
 
@@ -109,18 +111,80 @@ def fmt_km(km: float) -> str:
     return f"{km:.1f}".rstrip("0").rstrip(".")
 
 
-def hr_zones(profile: dict) -> list[tuple[int, int]] | None:
-    """Five zones. With resting HR: Karvonen (% of heart-rate reserve), else % of max HR."""
+# Joe Friel's running zones as % of lactate threshold HR (Z5 runs up to max HR).
+LTHR_BOUNDS = (0.65, 0.85, 0.90, 0.95, 1.00)
+
+
+@dataclass
+class Zones:
+    """Five HR zones and where they came from.
+
+    method: "watch" (the athlete's Garmin, from .FIT), "lthr" (threshold from the profile),
+    "karvonen" (% of HR reserve) or "max" (% of max HR).
+    """
+    zones: list[tuple[int, int]]
+    method: str
+    watch_calc: str | None = None    # watch only: percent_lthr / percent_max_hr / percent_hrr
+    lthr: int | None = None
+    as_of: str | None = None         # watch only: date of the activity the zones come from
+    running: bool = False            # watch only: zones of the running profile (Garmin keeps them per sport)
+    resting_hr: int | None = None    # karvonen only
+    resting_from_garmin: bool = False
+
+
+def watch_zones(row: dict | None) -> Zones | None:
+    """Zones from the latest activity's .FIT (bq_reader.get_athlete_inputs row)."""
+    try:
+        bounds = [int(x) for x in (row or {}).get("hr_zone_bounds", "").split(",") if x.strip()]
+    except (AttributeError, ValueError):
+        return None
+    if len(bounds) < 6 or bounds[:6] != sorted(bounds[:6]):
+        return None
+    as_of = row.get("zones_date")
+    return Zones([(bounds[i - 1], bounds[i]) for i in range(1, 6)], "watch", row.get("hr_zone_calc"),
+                 row.get("lthr"), as_of.isoformat() if hasattr(as_of, "isoformat") else as_of,
+                 running="running" in (row.get("zones_type") or ""))
+
+
+def compute_zones(profile: dict, watch: dict | None = None, garmin_resting_hr: int | None = None) -> Zones | None:
+    """Best available zones: watch -> threshold in profile -> Karvonen -> % of max HR."""
+    z = watch_zones(watch)
+    if z:
+        return z
     hr_max = profile.get("max_hr")
+    lthr = profile.get("lthr")
+    if lthr:
+        pts = [round(p * lthr) for p in LTHR_BOUNDS] + [hr_max or round(1.06 * lthr)]
+        return Zones([(pts[i], pts[i + 1]) for i in range(5)], "lthr", lthr=lthr)
     if not hr_max:
         return None
-    rest = profile.get("resting_hr")
+    rest = profile.get("resting_hr") or garmin_resting_hr
     bounds = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
     if rest:
         pts = [round(rest + b * (hr_max - rest)) for b in bounds]
-    else:
-        pts = [round(b * hr_max) for b in bounds]
-    return [(pts[i], pts[i + 1]) for i in range(5)]
+        return Zones([(pts[i], pts[i + 1]) for i in range(5)], "karvonen",
+                     resting_hr=rest, resting_from_garmin=not profile.get("resting_hr"))
+    pts = [round(b * hr_max) for b in bounds]
+    return Zones([(pts[i], pts[i + 1]) for i in range(5)], "max")
+
+
+WATCH_CALC = {"percent_lthr": "% of lactate threshold HR", "percent_max_hr": "% of max HR",
+              "percent_hrr": "% of HR reserve"}
+
+
+def _zones_note(z: Zones) -> str:
+    listed = ", ".join(f"Z{i + 1} {a}–{b}" for i, (a, b) in enumerate(z.zones))
+    if z.method == "watch":
+        how = WATCH_CALC.get(z.watch_calc or "", z.watch_calc or "unknown method")
+        return (f"{'Running ' if z.running else ''}HR zones from the athlete's Garmin watch ({how}"
+                + (f", LTHR {z.lthr}" if z.lthr else "") + f", as of {z.as_of}): {listed}. "
+                "Garmin's per-activity time in zone uses these same zones.")
+    if z.method == "lthr":
+        return f"HR zones from the lactate threshold HR {z.lthr} entered by the athlete (Friel): {listed}."
+    if z.method == "karvonen":
+        src = "Garmin 7-day average" if z.resting_from_garmin else "entered by the athlete"
+        return f"HR zones (Karvonen, % of HR reserve, resting HR {z.resting_hr} — {src}): {listed}."
+    return f"HR zones (% of max HR): {listed}."
 
 
 def active_goal(goal: dict | None, today: date) -> dict | None:
@@ -129,7 +193,8 @@ def active_goal(goal: dict | None, today: date) -> dict | None:
     return goal if date.fromisoformat(goal["date"]) >= today else None
 
 
-def athlete_note(profile: dict, goal: dict | None, today: date) -> str:
+def athlete_note(profile: dict, goal: dict | None, today: date, zones: Zones | None = None,
+                 garmin_resting_hr: int | None = None, lthr_then: tuple[int, str] | None = None) -> str:
     """English block for Claude's prompt: who the athlete is and what they train for."""
     lines = []
     facts = []
@@ -141,11 +206,15 @@ def athlete_note(profile: dict, goal: dict | None, today: date) -> str:
         facts.append(f"max HR {profile['max_hr']}")
     if profile.get("resting_hr"):
         facts.append(f"resting HR {profile['resting_hr']} (entered by the athlete)")
+    if garmin_resting_hr:
+        facts.append(f"resting HR {garmin_resting_hr} (Garmin, 7-day average)")
+    if profile.get("lthr"):
+        facts.append(f"lactate threshold HR {profile['lthr']} (entered by the athlete)")
     lines.append("Athlete profile: " + (", ".join(facts) if facts else "not filled in") + ".")
-    zones = hr_zones(profile)
     if zones:
-        method = "Karvonen, % of HR reserve" if profile.get("resting_hr") else "% of max HR"
-        lines.append(f"HR zones ({method}): " + ", ".join(f"Z{i + 1} {a}–{b}" for i, (a, b) in enumerate(zones)) + ".")
+        lines.append(_zones_note(zones))
+        if zones.method == "watch" and zones.lthr and lthr_then and lthr_then[0] != zones.lthr:
+            lines.append(f"Lactate threshold HR trend (watch): {lthr_then[0]} on {lthr_then[1]} -> {zones.lthr} now.")
     if profile.get("injuries"):
         lines.append(f"Injuries / limitations: {profile['injuries']}. Respect them in any advice.")
 

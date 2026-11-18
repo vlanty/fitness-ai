@@ -20,6 +20,8 @@ from datetime import date, datetime, timedelta, timezone
 
 import requests
 
+from fit_zones import extract_zones
+
 from .base import Batch, PartialFetch, RawFile, Source, to_json
 
 logger = logging.getLogger(__name__)
@@ -307,6 +309,7 @@ class GarminSource(Source):
                 path = f"garmin/activities/{act['activity_id']}.zip"
                 files.append(RawFile(path, r.content, "application/zip"))
                 act["raw_file"] = path
+                act.update(extract_zones(r.content))  # the watch's HR zones, empty if the file has none
             else:
                 logger.warning("garmin: файл активности %s: HTTP %d", act["activity_id"], r.status_code)
         health = self._health(start, end)
