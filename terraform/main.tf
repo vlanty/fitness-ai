@@ -42,6 +42,7 @@ resource "google_project_service" "apis" {
     "bigquery.googleapis.com",
     "artifactregistry.googleapis.com",
     "storage.googleapis.com",
+    "firestore.googleapis.com",
   ])
   service            = each.value
   disable_on_destroy = false
@@ -70,6 +71,22 @@ resource "google_project_iam_member" "runner_secrets" {
   project = var.gcp_project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.runner.email}"
+}
+
+resource "google_project_iam_member" "runner_firestore" {
+  project = var.gcp_project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.runner.email}"
+}
+
+# Bot state (profile, goals, settings, usage). Only the "(default)" database is in the free tier.
+resource "google_firestore_database" "state" {
+  name                    = "(default)"
+  location_id             = var.gcp_region
+  type                    = "FIRESTORE_NATIVE"
+  delete_protection_state = "DELETE_PROTECTION_ENABLED"
+  deletion_policy         = "ABANDON"
+  depends_on              = [google_project_service.apis]
 }
 
 resource "google_project_iam_member" "runner_run_invoker" {
