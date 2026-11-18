@@ -147,7 +147,7 @@ every log line and traceback.
 Prerequisites: [Google Cloud CLI](https://cloud.google.com/sdk/docs/install), [Terraform ≥ 1.7](https://developer.hashicorp.com/terraform/install), [Docker](https://docs.docker.com/engine/install/), Python 3.10+.
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/fitness-ai.git && cd fitness-ai
+git clone https://github.com/YOUR_USERNAME/second-wind.git && cd second-wind
 gcloud auth login && gcloud auth application-default login
 gcloud config set project YOUR_PROJECT_ID     # billing must be enabled
 ```
