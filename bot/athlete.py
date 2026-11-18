@@ -127,6 +127,7 @@ class Zones:
     watch_calc: str | None = None    # watch only: percent_lthr / percent_max_hr / percent_hrr
     lthr: int | None = None
     as_of: str | None = None         # watch only: date of the activity the zones come from
+    running: bool = False            # watch only: zones of the running profile (Garmin keeps them per sport)
     resting_hr: int | None = None    # karvonen only
     resting_from_garmin: bool = False
 
@@ -141,7 +142,8 @@ def watch_zones(row: dict | None) -> Zones | None:
         return None
     as_of = row.get("zones_date")
     return Zones([(bounds[i - 1], bounds[i]) for i in range(1, 6)], "watch", row.get("hr_zone_calc"),
-                 row.get("lthr"), as_of.isoformat() if hasattr(as_of, "isoformat") else as_of)
+                 row.get("lthr"), as_of.isoformat() if hasattr(as_of, "isoformat") else as_of,
+                 running="running" in (row.get("zones_type") or ""))
 
 
 def compute_zones(profile: dict, watch: dict | None = None, garmin_resting_hr: int | None = None) -> Zones | None:
@@ -174,7 +176,7 @@ def _zones_note(z: Zones) -> str:
     listed = ", ".join(f"Z{i + 1} {a}–{b}" for i, (a, b) in enumerate(z.zones))
     if z.method == "watch":
         how = WATCH_CALC.get(z.watch_calc or "", z.watch_calc or "unknown method")
-        return (f"HR zones from the athlete's Garmin watch ({how}"
+        return (f"{'Running ' if z.running else ''}HR zones from the athlete's Garmin watch ({how}"
                 + (f", LTHR {z.lthr}" if z.lthr else "") + f", as of {z.as_of}): {listed}. "
                 "Garmin's per-activity time in zone uses these same zones.")
     if z.method == "lthr":

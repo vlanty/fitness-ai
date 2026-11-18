@@ -69,7 +69,7 @@ def _zones_title(lang: str, z: Zones) -> str:
         how = t(lang, f"prof.zones.calc.{z.watch_calc}") if z.watch_calc in ("percent_lthr", "percent_max_hr",
                                                                          "percent_hrr") else (z.watch_calc or "?")
         as_of = date.fromisoformat(z.as_of).strftime("%d.%m.%Y") if z.as_of else "—"
-        return t(lang, "prof.zones.watch", how=how, date=as_of)
+        return t(lang, "prof.zones.watch_run" if z.running else "prof.zones.watch", how=how, date=as_of)
     if z.method == "lthr":
         return t(lang, "prof.zones.lthr", lthr=z.lthr)
     if z.method == "karvonen":

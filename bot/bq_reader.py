@@ -10,6 +10,8 @@ from google.cloud import bigquery
 from i18n import t
 
 STALE_AFTER = timedelta(hours=26)
+# Garmin keeps separate HR zones per sport; running ones go first.
+RUN_FIRST = "IFNULL(type, '') LIKE '%running%'"
 
 
 class BigQueryReader:
@@ -47,18 +49,20 @@ class BigQueryReader:
 
     def get_athlete_inputs(self) -> dict:
         """Watch HR zones from the latest .FIT, the threshold ~90 days earlier, and Garmin's
-        7-day resting HR. Missing parts are None (e.g. Strava-only installs have no zones)."""
+        7-day resting HR. Missing parts are None (e.g. Strava-only installs have no zones).
+        Garmin keeps zones per sport: running zones are preferred (the coach is a running coach),
+        any other activity's zones are the fallback."""
         rows = self._q(f"""
             WITH z AS (
-              SELECT activity_date AS zones_date, hr_zone_calc, hr_zone_bounds, lthr
+              SELECT activity_date AS zones_date, type AS zones_type, hr_zone_calc, hr_zone_bounds, lthr
               FROM `{self.prefix}.activities`
               WHERE hr_zone_bounds IS NOT NULL
-              ORDER BY start_time DESC LIMIT 1),
+              ORDER BY {RUN_FIRST} DESC, start_time DESC LIMIT 1),
             old AS (
               SELECT lthr AS lthr_then, activity_date AS lthr_then_date
               FROM `{self.prefix}.activities`
               WHERE lthr IS NOT NULL AND activity_date <= DATE_SUB(@today, INTERVAL 30 DAY)
-              ORDER BY ABS(DATE_DIFF(activity_date, DATE_SUB(@today, INTERVAL 90 DAY), DAY)) LIMIT 1),
+              ORDER BY {RUN_FIRST} DESC, ABS(DATE_DIFF(activity_date, DATE_SUB(@today, INTERVAL 90 DAY), DAY)) LIMIT 1),
             r AS (
               SELECT CAST(ROUND(AVG(resting_hr)) AS INT64) AS resting_hr_7d
               FROM `{self.prefix}.health_daily_unified`

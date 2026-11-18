@@ -175,5 +175,6 @@
   "prof.lthr_watch": "Threshold on the watch: {lthr}",
   "prof.lthr_trend": "({diff} since {date})",
   "prof.lthr_ignored": "The threshold in your profile isn't used: zones come from the watch.",
-  "prof.rest_garmin": "Resting HR from Garmin (7 days): {v}"
+  "prof.rest_garmin": "Resting HR from Garmin (7 days): {v}",
+  "prof.zones.watch_run": "Running heart-rate zones — from your Garmin watch ({how}, run of {date}):"
 }

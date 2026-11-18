@@ -175,5 +175,6 @@
   "prof.lthr_watch": "Порог на часах: {lthr}",
   "prof.lthr_trend": "({diff} с {date})",
   "prof.lthr_ignored": "Порог из профиля не используется: зоны берутся с часов.",
-  "prof.rest_garmin": "Пульс покоя по Garmin (7 дней): {v}"
+  "prof.rest_garmin": "Пульс покоя по Garmin (7 дней): {v}",
+  "prof.zones.watch_run": "Беговые пульсовые зоны — с часов Garmin ({how}, пробежка {date}):"
 }
