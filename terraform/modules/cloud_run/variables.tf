@@ -7,3 +7,11 @@ variable "data_sources" { type = list(string) }
 variable "raw_bucket" { type = string }
 variable "bot_secrets" { type = list(string) }
 variable "collector_secrets" { type = list(string) }
+variable "bot_models" {
+  type    = map(string)
+  default = {}
+}
+variable "bot_language" {
+  type    = string
+  default = ""
+}

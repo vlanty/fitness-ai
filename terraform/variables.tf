@@ -32,3 +32,15 @@ variable "sync_schedule" {
 
 # Secret values (Telegram, Anthropic, data-source keys) are not Terraform
 # variables: they live only in Secret Manager. See README / scripts/setup.py.
+
+variable "bot_models" {
+  description = "Optional Claude model per bot task (chat, analysis, weekly, alerts, morning). Empty = built-in defaults."
+  type        = map(string)
+  default     = {}
+}
+
+variable "bot_language" {
+  description = "Bot language for menus and commands (ru, en). Empty = each user's Telegram language. Free-form answers always follow the question's language."
+  type        = string
+  default     = ""
+}

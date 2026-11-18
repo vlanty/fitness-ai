@@ -16,9 +16,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 
-LABEL = "оценка fitness-ai, не Garmin"
+from i18n import t
 
-READINESS_BANDS = [(95, "отличная"), (75, "высокая"), (50, "средняя"), (25, "низкая"), (0, "плохая")]
+READINESS_BANDS = [(95, "excellent"), (75, "high"), (50, "moderate"), (25, "low"), (0, "poor")]
 READINESS_WEIGHTS = {"sleep": 0.25, "sleep_3n": 0.15, "hrv": 0.25, "load": 0.20, "stress_3d": 0.15}
 
 
@@ -36,10 +36,11 @@ class Estimate:
     value: str
     score: int | None = None
     factors: list[str] = field(default_factory=list)
+    lang: str = "en"
 
     def text(self, title: str) -> str:
         head = f"{title}: {self.score} — {self.value}" if self.score is not None else f"{title}: {self.value}"
-        return f"{head} ({LABEL})" + ("\n  " + "; ".join(self.factors) if self.factors else "")
+        return f"{head} ({t(self.lang, 'est.label')})" + ("\n  " + "; ".join(self.factors) if self.factors else "")
 
 
 def hrv_score(last: float | None, low: float | None, high: float | None) -> float | None:
@@ -69,10 +70,10 @@ def stress_score(avg_stress: float | None) -> float | None:
     return _clip(100 - max(0.0, avg_stress - 25) * 2)
 
 
-def readiness(health: list[dict], load: dict | None) -> Estimate:
+def readiness(health: list[dict], load: dict | None, lang: str = "en") -> Estimate:
     """health: health_daily_unified rows ordered by date (latest last); load: latest training_load_daily row."""
     if not health:
-        return Estimate("нет данных")
+        return Estimate(t(lang, "est.no_data"), lang=lang)
     today, last3 = health[-1], health[-3:]
     ratio = load.get("load_ratio") if load and load.get("load_ratio_zone") else None
     parts = {
@@ -84,23 +85,23 @@ def readiness(health: list[dict], load: dict | None) -> Estimate:
     }
     have = {k: v for k, v in parts.items() if v is not None}
     if len(have) < 3:
-        return Estimate("мало данных", factors=[f"есть факторов: {len(have)} из 5"])
+        return Estimate(t(lang, "est.little_data"), factors=[t(lang, "est.have_factors", n=len(have))], lang=lang)
     total = sum(READINESS_WEIGHTS[k] for k in have)
     score = round(sum(v * READINESS_WEIGHTS[k] for k, v in have.items()) / total)
-    band = next(name for floor, name in READINESS_BANDS if score >= floor)
-    names = {"sleep": "сон", "sleep_3n": "сон 3 ночи", "hrv": "HRV к норме", "load": "нагрузка", "stress_3d": "стресс 3 дня"}
+    band = t(lang, "est.band." + next(name for floor, name in READINESS_BANDS if score >= floor))
+    names = {k: t(lang, "est.f." + k) for k in parts}
     factors = [f"{names[k]} {round(v)}" for k, v in have.items()]
     missing = [names[k] for k in parts if k not in have]
     if missing:
-        factors.append("нет: " + ", ".join(missing))
-    factors.append("без recovery time (API его не отдаёт)")
-    return Estimate(band, score, factors)
+        factors.append(t(lang, "est.missing", list=", ".join(missing)))
+    factors.append(t(lang, "est.no_recovery"))
+    return Estimate(band, score, factors, lang)
 
 
-def training_status(load: dict | None, health: list[dict], today: date | None = None) -> Estimate:
+def training_status(load: dict | None, health: list[dict], today: date | None = None, lang: str = "en") -> Estimate:
     """Rule-based approximation of Garmin's training status levels."""
     if not load or not load.get("chronic_load"):
-        return Estimate("нет данных", factors=["нужно ≥ 4 недель тренировок с нагрузкой"])
+        return Estimate(t(lang, "est.no_data"), factors=[t(lang, "est.need_history")], lang=lang)
     today = today or load.get("date") or date.today()
     ratio, zone = load.get("load_ratio"), load.get("load_ratio_zone")
     vo2, vo2_old = load.get("vo2max"), load.get("vo2max_28d_ago")
@@ -110,21 +111,21 @@ def training_status(load: dict | None, health: list[dict], today: date | None = 
     idle_days = (today - last_act).days if last_act else None
 
     factors = [f"load ratio {ratio:.2f} ({zone})" if ratio is not None and zone else "load ratio —",
-               f"VO2 max {vo2:.1f} ({trend:+.1f} за 28 дн)" if trend is not None else "тренд VO2 max —",
+               t(lang, "est.vo2_trend", v=f"{vo2:.1f}", d=f"{trend:+.1f}") if trend is not None else t(lang, "est.vo2_none"),
                f"HRV status {hrv_status or '—'}"]
 
     if idle_days is not None and idle_days >= 7:
-        value = "детренированность: неделя и больше без тренировок"
+        value = "detraining"
     elif ratio is not None and ratio > 1.5:
-        value = "перегрузка: нагрузка резко выше привычной"
+        value = "overreaching"
     elif hrv_status in ("LOW", "POOR", "UNBALANCED") and (ratio or 0) >= 0.8:
-        value = "напряжение: восстановление не успевает за нагрузкой"
+        value = "strained"
     elif trend is not None and trend >= 1 and zone == "optimal":
-        value = "продуктивно: форма растёт"
+        value = "productive"
     elif trend is not None and trend <= -1 and (ratio or 0) >= 0.8:
-        value = "непродуктивно: нагрузка есть, форма падает"
+        value = "unproductive"
     elif zone == "low":
-        value = "восстановление: нагрузка ниже привычной"
+        value = "recovery"
     else:
-        value = "поддержание формы"
-    return Estimate(value, factors=factors)
+        value = "maintaining"
+    return Estimate(t(lang, "est.st." + value), factors=factors, lang=lang)
