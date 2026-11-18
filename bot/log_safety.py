@@ -35,13 +35,25 @@ def redact(text: str) -> str:
     return text
 
 
+def _clean(arg):
+    """Numbers stay numbers (for %d); anything else (strings, exceptions, URLs) is redacted text."""
+    if arg is None or isinstance(arg, (bool, int, float)):
+        return arg
+    return redact(str(arg))
+
+
 class RedactSecrets(logging.Filter):
     _fmt = logging.Formatter()
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
-            record.msg = redact(record.getMessage())
-            record.args = None
+            # Keep msg/args shape: some formatters (uvicorn access log) unpack record.args.
+            if isinstance(record.msg, str):
+                record.msg = redact(record.msg)
+            if isinstance(record.args, tuple):
+                record.args = tuple(_clean(a) for a in record.args)
+            elif isinstance(record.args, dict):
+                record.args = {k: _clean(v) for k, v in record.args.items()}
             if record.exc_info and not record.exc_text:
                 record.exc_text = self._fmt.formatException(record.exc_info)
             if record.exc_text:
