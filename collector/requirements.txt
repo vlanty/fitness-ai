@@ -1,3 +1,4 @@
 requests==2.32.3
 google-cloud-bigquery==3.27.0
 google-cloud-storage==2.19.0
+garmin-fit-sdk==21.222.0

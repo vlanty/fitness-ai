@@ -11,7 +11,7 @@ from datetime import date
 from telegram import InlineKeyboardButton as Btn, InlineKeyboardMarkup as Kb
 
 from athlete import (DISTANCES, PROFILE_FIELDS, InvalidInput, active_goal, fmt_duration, fmt_km, fmt_pace,
-                     hr_zones, parse_date, parse_distance, parse_duration, parse_profile_value)
+                     Zones, compute_zones, parse_date, parse_distance, parse_duration, parse_profile_value)
 from i18n import SUPPORTED, t
 from models import DEFAULT_MODE, MODES
 from state import StateStore
@@ -64,20 +64,47 @@ def apply_setting(store: StateStore, chat_id: int, key: str, value: str) -> bool
 
 # ---------- profile ----------
 
-def render_profile(lang: str, profile: dict) -> tuple[str, Kb]:
+def _zones_title(lang: str, z: Zones) -> str:
+    if z.method == "watch":
+        how = t(lang, f"prof.zones.calc.{z.watch_calc}") if z.watch_calc in ("percent_lthr", "percent_max_hr",
+                                                                         "percent_hrr") else (z.watch_calc or "?")
+        as_of = date.fromisoformat(z.as_of).strftime("%d.%m.%Y") if z.as_of else "—"
+        return t(lang, "prof.zones.watch", how=how, date=as_of)
+    if z.method == "lthr":
+        return t(lang, "prof.zones.lthr", lthr=z.lthr)
+    if z.method == "karvonen":
+        src = t(lang, "prof.zones.rest_garmin" if z.resting_from_garmin else "prof.zones.rest_profile")
+        return t(lang, "prof.zones.karvonen_rest", rest=z.resting_hr, src=src)
+    return t(lang, "prof.zones", method=t(lang, "prof.zones.max"))
+
+
+def render_profile(lang: str, profile: dict, watch: dict | None = None) -> tuple[str, Kb]:
+    """watch: bq_reader.get_athlete_inputs() row (zones from the watch, threshold trend, Garmin resting HR)."""
+    watch = watch or {}
     lines = [f"<b>{t(lang, 'prof.title')}</b>", ""]
     for f in PROFILE_FIELDS:
         v = profile.get(f)
         shown = "—" if v in (None, "") else f"{v}{t(lang, 'prof.unit.' + f) if f == 'weight_kg' else ''}"
         lines.append(t(lang, "prof.line", name=t(lang, f"prof.{f}"), v=_esc(shown)))
     lines.append("")
-    zones = hr_zones(profile)
-    if zones:
-        method = "karvonen" if profile.get("resting_hr") else "max"
-        lines.append(t(lang, "prof.zones", method=t(lang, f"prof.zones.{method}")))
-        lines += [f"Z{i + 1}: {a}–{b}" for i, (a, b) in enumerate(zones)]
+    z = compute_zones(profile, watch, watch.get("resting_hr_7d"))
+    if z:
+        lines.append(_zones_title(lang, z))
+        lines += [f"Z{i + 1}: {a}–{b}" for i, (a, b) in enumerate(z.zones)]
+        if z.method == "watch" and z.lthr:
+            then = watch.get("lthr_then")
+            trend = ""
+            if then and then != z.lthr:
+                d = watch.get("lthr_then_date")
+                trend = " " + t(lang, "prof.lthr_trend", diff=f"{z.lthr - then:+d}",
+                                date=d.strftime("%d.%m.%Y") if hasattr(d, "strftime") else d)
+            lines.append(t(lang, "prof.lthr_watch", lthr=z.lthr) + trend)
+            if profile.get("lthr"):
+                lines.append(t(lang, "prof.lthr_ignored"))
     else:
         lines.append(t(lang, "prof.zones.need"))
+    if watch.get("resting_hr_7d"):
+        lines.append(t(lang, "prof.rest_garmin", v=watch["resting_hr_7d"]))
     lines += ["", t(lang, "prof.footer")]
     fields = list(PROFILE_FIELDS)
     rows = [[Btn(t(lang, f"prof.{f}"), callback_data=f"prof:edit:{f}") for f in fields[i:i + 2]]
@@ -122,14 +149,14 @@ def ask_text(lang: str, pending: dict) -> str:
 
 
 def handle_input(store: StateStore, chat_id: int, lang: str, pending: dict, text: str,
-                 today: date) -> tuple[str, Kb | None]:
+                 today: date, watch: dict | None = None) -> tuple[str, Kb | None]:
     """Applies one text answer to the pending question. Returns the next screen or question."""
     try:
         if pending["kind"] == "profile":
             field = pending["field"]
             store.update_profile(chat_id, {field: parse_profile_value(field, text)})
             store.set_pending(chat_id, None)
-            return render_profile(lang, store.get_user(chat_id).get("profile", {}))
+            return render_profile(lang, store.get_user(chat_id).get("profile", {}), watch)
 
         data = dict(pending.get("data", {}))
         step = pending["step"]
