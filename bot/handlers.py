@@ -1,15 +1,17 @@
 import logging
 import os
-from datetime import date
+from datetime import date, timedelta
 from functools import lru_cache
 
-from telegram import BotCommand, BotCommandScopeChat, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import BotCommand, BotCommandScopeChat, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 from telegram.helpers import escape_markdown
 
 from bq_reader import BigQueryReader, stale_warnings
 from claude_client import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, NUTRITION_PROMPT, Refused, analyze
+import analytics
+import charts
 from athlete import DISTANCES, PROFILE_FIELDS, athlete_note, compute_zones
 from estimates import readiness, training_status
 from i18n import SUPPORTED, resolve, t
@@ -25,9 +27,11 @@ SOURCE_LABEL = {"garmin": "Garmin", "strava": "Strava"}
 CONTEXT_LANG = "en"  # data handed to Claude is formatted in English; Claude answers in the user's language
 
 # Commands in the Telegram "Menu" list, in display order. /start stays hidden (Telegram sends it itself).
-MENU_COMMANDS = ["menu", "today", "week", "coach", "health", "nutrition", "goal", "profile", "settings", "status"]
+MENU_COMMANDS = ["menu", "today", "week", "month", "compare", "records", "charts", "coach", "health", "nutrition",
+                 "goal", "profile", "settings", "status"]
 # Inline buttons under /start and /menu, two per row.
-MENU_BUTTONS = [["today", "week"], ["coach", "health"], ["nutrition", "goal"], ["profile", "settings"], ["status"]]
+MENU_BUTTONS = [["today", "week"], ["month", "compare"], ["records", "charts"], ["coach", "health"],
+                ["nutrition", "goal"], ["profile", "settings"], ["status"]]
 
 
 def _bq():
@@ -177,6 +181,15 @@ def _context(bq: BigQueryReader) -> str:
     loads = bq.get_load_last_days(1)
     load = loads[-1] if loads else None
     warn = stale_warnings(bq.get_source_status(), _enabled_sources(), lang)
+    today = date.today()
+    month_start = today.replace(day=1)
+    prev_end = month_start - timedelta(days=1)
+    try:
+        month = analytics.month_note(bq.get_period(month_start, today), bq.get_period(prev_end.replace(day=1), prev_end))
+        records = analytics.records_note(bq.get_records(today - timedelta(days=365)))
+    except Exception as e:  # noqa: BLE001 - extra context must not block the answer
+        logger.error("analytics context failed: %s", e)
+        month = records = "unavailable"
     return (
         "=== LAST WORKOUT ===\n" + (_fmt_activity(last, lang) if last else "no data") + "\n\n"
         "=== WORKOUTS: THIS WEEK ===\n" + ("\n\n".join(_fmt_activity(a, lang) for a in acts) or "none") + "\n\n"
@@ -186,6 +199,8 @@ def _context(bq: BigQueryReader) -> str:
         "=== TRAINING LOAD (computed by Second Wind from Garmin data) ===\n" + _fmt_load(load, lang) + "\n\n"
         "=== SECOND WIND ESTIMATES (NOT Garmin metrics; call them our estimate) ===\n"
         + _estimates(health, load, lang) + "\n\n"
+        "=== MONTH ===\n" + month + "\n\n"
+        "=== PERSONAL RECORDS (best efforts within runs, Garmin) ===\n" + records + "\n\n"
         + ("=== DATA FRESHNESS ===\n" + "\n".join(warn) if warn else "")
     )
 
@@ -269,6 +284,66 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await _on_profile_button(update, rest)
     elif kind == "goal":
         await _on_goal_button(update, rest)
+    elif kind == "cmp" and rest in analytics.COMPARE_SPANS:
+        await _send_compare(update, rest)
+    elif kind == "chart" and rest in charts.CHARTS:
+        await _send_chart(update, rest)
+
+
+# ---------- analytics without AI ----------
+
+async def cmd_records(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+    lang = _lang(update)
+    rows = _bq().get_records(date.today() - timedelta(days=365))
+    await _reply(update, analytics.render_records(lang, rows), parse_mode="HTML")
+
+
+async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+    lang = _lang(update)
+    today = date.today()
+    prev_end = today.replace(day=1) - timedelta(days=1)
+    bq = _bq()
+    text = analytics.render_month(lang, today, bq.get_period(today.replace(day=1), today),
+                                  bq.get_period(prev_end.replace(day=1), prev_end))
+    await _reply(update, text, parse_mode="HTML")
+
+
+async def cmd_compare(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+    lang = _lang(update)
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, f"cmp.btn.{s}"), callback_data=f"cmp:{s}")
+                                for s in analytics.COMPARE_SPANS]])
+    await _reply(update, t(lang, "cmp.pick"), reply_markup=kb)
+
+
+async def _send_compare(update: Update, span: str):
+    lang = _lang(update)
+    today = date.today()
+    (a0, a1), (b0, b1) = analytics.periods(span, today)
+    bq = _bq()
+    text = analytics.render_compare(lang, span, today, bq.get_period(a0, a1), bq.get_period(b0, b1))
+    await _reply(update, text, parse_mode="HTML")
+
+
+async def cmd_charts(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+    lang = _lang(update)
+    names = list(charts.CHARTS)
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(t(lang, f"chart.btn.{c}"), callback_data=f"chart:{c}")
+                                for c in names[i:i + 2]] for i in range(0, len(names), 2)])
+    await _reply(update, t(lang, "chart.pick"), reply_markup=kb)
+
+
+async def _send_chart(update: Update, name: str):
+    lang = _lang(update)
+    png = charts.render(name, lang, _bq())
+    await update.effective_message.reply_photo(InputFile(png, filename=f"{name}.png"))
 
 
 # ---------- settings, profile, goal ----------
@@ -548,7 +623,8 @@ def _clears_pending(handler):
 COMMANDS = {
     "menu": cmd_menu, "today": cmd_today, "week": cmd_week, "coach": cmd_coach,
     "health": cmd_health, "nutrition": cmd_nutrition, "goal": cmd_goal, "profile": cmd_profile,
-    "settings": cmd_settings, "status": cmd_status,
+    "settings": cmd_settings, "status": cmd_status, "records": cmd_records, "month": cmd_month,
+    "compare": cmd_compare, "charts": cmd_charts,
 }
 # What Telegram's command handlers call (button presses go through COMMANDS directly).
 COMMAND_HANDLERS = {**{k: _clears_pending(v) for k, v in COMMANDS.items()}, "cancel": cmd_cancel}

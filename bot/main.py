@@ -27,7 +27,7 @@ tg = Application.builder().token(BOT_TOKEN).build()
 tg.add_handler(CommandHandler("start", _clears_pending(cmd_start)))
 for name, handler in COMMAND_HANDLERS.items():
     tg.add_handler(CommandHandler(name, handler))
-tg.add_handler(CallbackQueryHandler(on_button, pattern=r"^(cmd|set|prof|goal):"))
+tg.add_handler(CallbackQueryHandler(on_button, pattern=r"^(cmd|set|prof|goal|cmp|chart):"))
 tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
 
 
