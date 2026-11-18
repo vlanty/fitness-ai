@@ -43,6 +43,10 @@ def _allowed(update: Update) -> bool:
 
 
 def _lang(update: Update) -> str:
+    """BOT_LANGUAGE (set at deploy) wins; otherwise the user's Telegram app language."""
+    forced = os.environ.get("BOT_LANGUAGE", "").strip()
+    if forced:
+        return resolve(forced)
     user = update.effective_user
     return resolve(user.language_code if user else None)
 

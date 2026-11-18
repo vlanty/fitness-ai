@@ -73,7 +73,7 @@ Data:
 
 {format}
 
-Answer in {language}, to the point, up to 250 words."""
+Answer in the language the question is written in (if that is unclear, in {language}), to the point, up to 250 words."""
 
 
 _client: anthropic.Anthropic | None = None

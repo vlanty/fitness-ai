@@ -5,6 +5,10 @@ gcp_region     = "europe-west3"
 # Расписание синхронизации (cron, UTC)
 sync_schedule = "0 1 * * *"
 
+# Необязательно: язык меню и команд бота (ru, en). Пусто — язык из настроек Telegram.
+# Свободные вопросы бот всегда отвечает на языке вопроса.
+# bot_language = "ru"
+
 # Необязательно: другая модель Claude для задачи бота (chat, analysis, weekly, alerts, morning).
 # По умолчанию: chat/analysis — claude-sonnet-5-5, остальное — claude-haiku-5-5.
 # bot_models = { chat = "claude-opus-5-5" }

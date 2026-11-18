@@ -38,3 +38,9 @@ variable "bot_models" {
   type        = map(string)
   default     = {}
 }
+
+variable "bot_language" {
+  description = "Bot language for menus and commands (ru, en). Empty = each user's Telegram language. Free-form answers always follow the question's language."
+  type        = string
+  default     = ""
+}

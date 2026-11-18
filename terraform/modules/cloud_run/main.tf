@@ -85,6 +85,15 @@ resource "google_cloud_run_v2_service" "bot" {
         }
       }
 
+      # Fixed bot language (menus, commands); empty = the user's Telegram language.
+      dynamic "env" {
+        for_each = var.bot_language == "" ? [] : [var.bot_language]
+        content {
+          name  = "BOT_LANGUAGE"
+          value = env.value
+        }
+      }
+
       # Optional Claude model overrides per task, e.g. { chat = "claude-opus-5-5" } -> MODEL_CHAT.
       dynamic "env" {
         for_each = var.bot_models
