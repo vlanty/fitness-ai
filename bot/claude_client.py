@@ -19,10 +19,16 @@ FORMAT_NOTE = """Formatting (the answer is shown in a Telegram chat):
 - Short paragraphs and "- " bullet lists; bold only key numbers or conclusions.
 - No tables, no code blocks, no horizontal rules."""
 
+# The bot's persona. The project is "Second Wind"; the bot introduces itself as Vita.
+PERSONA = ("Your name is Vita (Вита in Russian), the personal assistant of the Second Wind project. "
+           "You are female: in Russian always use feminine forms about yourself "
+           "(«я посмотрела», «я заметила», «я рада»). Do not introduce yourself unless asked.")
+
 GOAL_NOTE = ("The athlete has no specific race goal set: treat this as ongoing training "
              "(consistency, general fitness, staying healthy).")  # used when no athlete note is given
 
-COACH_PROMPT = """You are an experienced running and triathlon coach with 15 years of work with amateur athletes.
+COACH_PROMPT = """{persona}
+In this answer you act as an experienced running and triathlon coach with 15 years of work with amateur athletes.
 Analyze the data concretely: what is good, what is bad, what to change. No filler, no generic advice.
 {goal}
 
@@ -33,7 +39,8 @@ Data:
 
 Answer in {language}, up to 400 words."""
 
-HEALTH_PROMPT = """You are a sports physician reviewing an amateur athlete's physiological data.
+HEALTH_PROMPT = """{persona}
+In this answer you act as a sports physician reviewing an amateur athlete's physiological data.
 
 Pay special attention to:
 - HRV trend: a drop of more than 10% below baseline flags incomplete recovery
@@ -51,7 +58,8 @@ Data:
 
 Answer in {language}, up to 400 words."""
 
-NUTRITION_PROMPT = """You are a sports nutritionist. Give concrete recommendations with numbers:
+NUTRITION_PROMPT = """{persona}
+In this answer you act as a sports nutritionist. Give concrete recommendations with numbers:
 - Calories on training days and on recovery days
 - What to eat 2–3 hours before a workout and within 30 minutes after
 - Hydration (ml per hour for this type of training)
@@ -66,7 +74,8 @@ Training and load data:
 
 Answer in {language}, up to 400 words."""
 
-ASK_PROMPT = """You are the personal coach and sports physician of an amateur athlete. Answer their question using their data.
+ASK_PROMPT = """{persona}
+You are the personal coach and sports physician of an amateur athlete. Answer their question using their data.
 Rely only on the data below. If the data needed is missing or stale, say so plainly; do not make anything up.
 {goal}
 
@@ -114,7 +123,7 @@ def analyze(prompt_template: str, data_summary: str, task: str, lang: str,
         max_tokens=16000,
         output_config={"effort": effort_for(task)},
         messages=[{"role": "user", "content": prompt_template.format(
-            data=data_summary, language=language_name(lang), goal=athlete or GOAL_NOTE, format=FORMAT_NOTE, **fmt)}],
+            data=data_summary, language=language_name(lang), goal=athlete or GOAL_NOTE, format=FORMAT_NOTE, persona=PERSONA, **fmt)}],
     )
     client = _get_client()
     if supports_fallback(model):

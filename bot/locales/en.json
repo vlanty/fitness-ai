@@ -1,5 +1,5 @@
 {
-  "menu.title": "🏃 Fitness AI\n\nPick what to show, or just ask a question: \"how did my last workout go?\", \"how did I sleep last night?\"",
+  "menu.title": "🏃 Vita\n\nPick what to show, or just ask a question: \"how did my last workout go?\", \"how did I sleep last night?\"",
   "btn.today": "📍 Today",
   "btn.week": "📅 Week",
   "btn.coach": "🏃 Coach",
@@ -54,7 +54,7 @@
   "load.focus.anaerobic": "anaerobic",
   "load.vo2": "VO2 max {v}",
   "load.vo2_trend": " ({d} over 28 d)",
-  "est.label": "fitness-ai estimate, not Garmin's",
+  "est.label": "our estimate, not Garmin's",
   "est.readiness": "Readiness",
   "est.status": "Training status",
   "est.no_data": "no data",

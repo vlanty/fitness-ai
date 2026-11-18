@@ -183,8 +183,8 @@ def _context(bq: BigQueryReader) -> str:
         "=== WORKOUTS: LAST WEEK ===\n" + ("\n\n".join(_fmt_activity(a, lang) for a in prev) or "none") + "\n\n"
         "=== HEALTH BY DAY (14 days: sleep, HRV, resting HR, stress, Body Battery) ===\n"
         + ("\n".join(_fmt_health(h, lang) for h in health) or "no data") + "\n\n"
-        "=== TRAINING LOAD (computed by fitness-ai from Garmin data) ===\n" + _fmt_load(load, lang) + "\n\n"
-        "=== fitness-ai ESTIMATES (NOT Garmin metrics; call them our estimate) ===\n"
+        "=== TRAINING LOAD (computed by Second Wind from Garmin data) ===\n" + _fmt_load(load, lang) + "\n\n"
+        "=== SECOND WIND ESTIMATES (NOT Garmin metrics; call them our estimate) ===\n"
         + _estimates(health, load, lang) + "\n\n"
         + ("=== DATA FRESHNESS ===\n" + "\n".join(warn) if warn else "")
     )
