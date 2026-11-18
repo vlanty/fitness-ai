@@ -23,21 +23,21 @@ and replies in the language you asked in. If data is missing or out of date, she
 instead of guessing.
 
 ### 🧠 Gives expert reviews in one tap
-| | |
+| Command | What you get |
 |---|---|
 | 🏃 `/coach` | what went well, what didn't, what to change in your training |
 | ❤️ `/health` | recovery, fatigue and warning signs from HRV, resting HR, sleep and Body Battery |
 | 🥗 `/nutrition` | calories for training and rest days, what to eat before and after, hydration |
 
 ### 📊 Shows your numbers instantly, without AI
-| | |
+| Command | What you get |
 |---|---|
 | 📍 `/today` | last workout, last night, training load, **readiness** and **training status** |
 | 📅 `/week` | everything you did this week |
 | 🔄 `/status` | when each data source last synced, with a warning if one is stale |
 
 ### 🎯 Knows who she is coaching
-| | |
+| Command | What you get |
 |---|---|
 | 🎯 `/goal` | a race, its date and your target time; without a goal she coaches for steady progress |
 | 👤 `/profile` | age, weight, heart rate and injuries, so the advice fits you |
