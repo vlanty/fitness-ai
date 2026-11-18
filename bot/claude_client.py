@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 
 import anthropic
 
 from i18n import language_name
-from models import effort_for, model_for, supports_fallback
+from models import DEFAULT_MODE, cost_usd, effort_for, model_for, supports_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ FORMAT_NOTE = """Formatting (the answer is shown in a Telegram chat):
 - No tables, no code blocks, no horizontal rules."""
 
 GOAL_NOTE = ("The athlete has no specific race goal set: treat this as ongoing training "
-             "(consistency, general fitness, staying healthy).")
+             "(consistency, general fitness, staying healthy).")  # used when no athlete note is given
 
 COACH_PROMPT = """You are an experienced running and triathlon coach with 15 years of work with amateur athletes.
 Analyze the data concretely: what is good, what is bad, what to change. No filler, no generic advice.
@@ -41,6 +42,7 @@ Pay special attention to:
 - Body Battery: persistently low means accumulated fatigue
 
 If you see worrying patterns, say so directly.
+{goal}
 
 Data:
 {data}
@@ -54,6 +56,8 @@ NUTRITION_PROMPT = """You are a sports nutritionist. Give concrete recommendatio
 - What to eat 2–3 hours before a workout and within 30 minutes after
 - Hydration (ml per hour for this type of training)
 - For long workouts, a fueling strategy during the session
+Base calorie numbers on the athlete profile when it is given; if weight is missing, say what you assumed.
+{goal}
 
 Training and load data:
 {data}
@@ -90,14 +94,27 @@ class Refused(Exception):
     """Claude (and any fallback model) declined the request."""
 
 
-def analyze(prompt_template: str, data_summary: str, task: str, lang: str, **fmt) -> str:
-    model = model_for(task)
+@dataclass
+class Answer:
+    text: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+
+    @property
+    def cost_usd(self) -> float:
+        return cost_usd(self.model, self.input_tokens, self.output_tokens)
+
+
+def analyze(prompt_template: str, data_summary: str, task: str, lang: str,
+            mode: str = DEFAULT_MODE, athlete: str | None = None, **fmt) -> Answer:
+    model = model_for(task, mode)
     params = dict(
         model=model,
         max_tokens=16000,
         output_config={"effort": effort_for(task)},
         messages=[{"role": "user", "content": prompt_template.format(
-            data=data_summary, language=language_name(lang), goal=GOAL_NOTE, format=FORMAT_NOTE, **fmt)}],
+            data=data_summary, language=language_name(lang), goal=athlete or GOAL_NOTE, format=FORMAT_NOTE, **fmt)}],
     )
     client = _get_client()
     if supports_fallback(model):
@@ -112,4 +129,5 @@ def analyze(prompt_template: str, data_summary: str, task: str, lang: str, **fmt
         logger.warning("Claude answer cut by max_tokens (task=%s, model=%s)", task, model)
     logger.info("claude task=%s model=%s in=%s out=%s", task, response.model,
                 response.usage.input_tokens, response.usage.output_tokens)
-    return "\n".join(b.text for b in response.content if b.type == "text").strip()
+    text = "\n".join(b.text for b in response.content if b.type == "text").strip()
+    return Answer(text, response.model, response.usage.input_tokens, response.usage.output_tokens)

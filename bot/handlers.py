@@ -1,5 +1,7 @@
 import logging
 import os
+from datetime import date
+from functools import lru_cache
 
 from telegram import BotCommand, BotCommandScopeChat, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import BadRequest
@@ -8,8 +10,13 @@ from telegram.helpers import escape_markdown
 
 from bq_reader import BigQueryReader, stale_warnings
 from claude_client import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, NUTRITION_PROMPT, Refused, analyze
+from athlete import DISTANCES, PROFILE_FIELDS, athlete_note
 from estimates import readiness, training_status
 from i18n import SUPPORTED, resolve, t
+from models import DEFAULT_MODE
+from state import FirestoreStore, StateStore
+from user_ui import (apply_setting, ask_text, distance_keyboard, handle_input, render_goal, render_profile,
+                     render_settings)
 from tg_format import html_to_plain, md_to_html, split_message
 
 logger = logging.getLogger(__name__)
@@ -18,9 +25,9 @@ SOURCE_LABEL = {"garmin": "Garmin", "strava": "Strava"}
 CONTEXT_LANG = "en"  # data handed to Claude is formatted in English; Claude answers in the user's language
 
 # Commands in the Telegram "Menu" list, in display order. /start stays hidden (Telegram sends it itself).
-MENU_COMMANDS = ["menu", "today", "week", "coach", "health", "nutrition", "status"]
+MENU_COMMANDS = ["menu", "today", "week", "coach", "health", "nutrition", "goal", "profile", "settings", "status"]
 # Inline buttons under /start and /menu, two per row.
-MENU_BUTTONS = [["today", "week"], ["coach", "health"], ["nutrition", "status"]]
+MENU_BUTTONS = [["today", "week"], ["coach", "health"], ["nutrition", "goal"], ["profile", "settings"], ["status"]]
 
 
 def _bq():
@@ -42,13 +49,34 @@ def _allowed(update: Update) -> bool:
     return bool(owner) and chat is not None and str(chat.id) == owner
 
 
-def _lang(update: Update) -> str:
-    """BOT_LANGUAGE (set at deploy) wins; otherwise the user's Telegram app language."""
+@lru_cache(maxsize=1)
+def _store() -> StateStore:
+    return FirestoreStore(os.environ["GCP_PROJECT"])
+
+
+def _chat_id(update: Update) -> int:
+    return update.effective_chat.id
+
+
+def _user(update: Update) -> dict:
+    """The user's stored state; {} if storage is unavailable (the bot keeps working without it)."""
+    try:
+        return _store().get_user(_chat_id(update))
+    except Exception as e:  # noqa: BLE001
+        logger.error("state read failed: %s", e)
+        return {}
+
+
+def _lang(update: Update, user: dict | None = None) -> str:
+    """Language chosen in /settings, else BOT_LANGUAGE (set at deploy), else the Telegram app language."""
+    chosen = ((user if user is not None else _user(update)).get("settings") or {}).get("lang")
+    if chosen in SUPPORTED:
+        return chosen
     forced = os.environ.get("BOT_LANGUAGE", "").strip()
     if forced:
         return resolve(forced)
-    user = update.effective_user
-    return resolve(user.language_code if user else None)
+    tg_user = update.effective_user
+    return resolve(tg_user.language_code if tg_user else None)
 
 
 def _md(v) -> str:
@@ -187,9 +215,18 @@ async def setup_menu(bot) -> None:
         logger.warning("TELEGRAM_CHAT_ID is not set; command menu not registered")
         return
     scope = BotCommandScopeChat(int(owner))
+    # A language fixed in /settings or by BOT_LANGUAGE applies whatever the Telegram app language is.
+    try:
+        chosen = (_store().get_user(int(owner)).get("settings") or {}).get("lang")
+    except Exception as e:  # noqa: BLE001
+        logger.error("state read failed: %s", e)
+        chosen = None
+    forced = chosen if chosen in SUPPORTED else (resolve(os.environ["BOT_LANGUAGE"])
+                                                 if os.environ.get("BOT_LANGUAGE", "").strip() else None)
     for lang in SUPPORTED:
-        commands = [BotCommand(c, t(lang, f"cmd.{c}")) for c in MENU_COMMANDS]
-        # English is also the fallback for any other Telegram language.
+        shown = forced or lang
+        commands = [BotCommand(c, t(shown, f"cmd.{c}")) for c in MENU_COMMANDS]
+        # The English list (no language_code) is also the fallback for any other Telegram language.
         await bot.set_my_commands(commands, scope=scope, language_code=None if lang == "en" else lang)
 
 
@@ -203,14 +240,133 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 cmd_menu = cmd_start
 
 
-async def on_menu_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """All inline buttons: cmd:<command>, set:<key>:<value>, prof:..., goal:..."""
     query = update.callback_query
     await query.answer()
     if not await _guard(update):
         return
-    handler = COMMANDS.get((query.data or "").removeprefix("cmd:"))
-    if handler:
-        await handler(update, ctx)
+    kind, _, rest = (query.data or "").partition(":")
+    if kind == "cmd" and rest in COMMANDS:
+        await COMMANDS[rest](update, ctx)
+    elif kind == "set":
+        await _on_setting(update, *rest.partition(":")[::2])
+    elif kind == "prof":
+        await _on_profile_button(update, rest)
+    elif kind == "goal":
+        await _on_goal_button(update, rest)
+
+
+# ---------- settings, profile, goal ----------
+
+async def _show(update: Update, text: str, kb, edit: bool = False):
+    """Show a screen: edit the message with the pressed button, or send a new one."""
+    if edit and update.callback_query:
+        try:
+            await update.callback_query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
+            return
+        except BadRequest as e:  # e.g. "message is not modified"
+            logger.info("edit skipped: %s", e)
+            return
+    await _reply(update, text, parse_mode="HTML", reply_markup=kb)
+
+
+async def _stored(update: Update, lang: str, action) -> bool:
+    """Run a state write; tell the user if storage is down."""
+    try:
+        action()
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.error("state write failed: %s", e)
+        await _reply(update, t(lang, "storage.error"))
+        return False
+
+
+def _month() -> str:
+    return date.today().strftime("%Y-%m")
+
+
+async def cmd_settings(update: Update, ctx: ContextTypes.DEFAULT_TYPE, edit: bool = False):
+    if not await _guard(update):
+        return
+    user = _user(update)
+    lang = _lang(update, user)
+    try:
+        usage = _store().get_usage(_chat_id(update), _month())
+    except Exception as e:  # noqa: BLE001
+        logger.error("usage read failed: %s", e)
+        usage = {}
+    await _show(update, *render_settings(lang, user.get("settings") or {}, usage), edit=edit)
+
+
+async def _on_setting(update: Update, key: str, value: str):
+    lang = _lang(update)
+    ok = await _stored(update, lang, lambda: apply_setting(_store(), _chat_id(update), key, value))
+    if ok:
+        if key == "lang":
+            await setup_menu(update.get_bot())
+        await cmd_settings(update, None, edit=True)
+
+
+async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE, edit: bool = False):
+    if not await _guard(update):
+        return
+    user = _user(update)
+    await _show(update, *render_profile(_lang(update, user), user.get("profile") or {}), edit=edit)
+
+
+async def _on_profile_button(update: Update, rest: str):
+    lang = _lang(update)
+    action, _, field = rest.partition(":")
+    if action == "clear":
+        if await _stored(update, lang, lambda: _store().clear_profile(_chat_id(update))):
+            await _reply(update, t(lang, "prof.cleared"))
+            await cmd_profile(update, None)
+    elif action == "edit" and field in PROFILE_FIELDS:
+        pending = {"kind": "profile", "field": field}
+        if await _stored(update, lang, lambda: _store().set_pending(_chat_id(update), pending)):
+            await _reply(update, ask_text(lang, pending))
+
+
+async def cmd_goal(update: Update, ctx: ContextTypes.DEFAULT_TYPE, edit: bool = False):
+    if not await _guard(update):
+        return
+    lang = _lang(update)
+    try:
+        goal = _store().get_goal(_chat_id(update))
+    except Exception as e:  # noqa: BLE001
+        logger.error("goal read failed: %s", e)
+        goal = None
+    await _show(update, *render_goal(lang, goal, date.today()), edit=edit)
+
+
+async def _on_goal_button(update: Update, rest: str):
+    lang = _lang(update)
+    action, _, value = rest.partition(":")
+    chat = _chat_id(update)
+    if action == "new":
+        await _reply(update, t(lang, "goal.ask.distance"), reply_markup=distance_keyboard(lang))
+    elif action == "delete":
+        if await _stored(update, lang, lambda: _store().delete_goal(chat)):
+            await _reply(update, t(lang, "goal.deleted"))
+    elif action == "dist":
+        km = DISTANCES.get(value)
+        pending = ({"kind": "goal", "step": "date", "data": {"distance_km": km}} if km
+                   else {"kind": "goal", "step": "distance_other", "data": {}})
+        if await _stored(update, lang, lambda: _store().set_pending(chat, pending)):
+            await _reply(update, ask_text(lang, pending))
+
+
+async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not await _guard(update):
+        return
+    user = _user(update)
+    lang = _lang(update, user)
+    if not user.get("pending"):
+        await _reply(update, t(lang, "nothing_to_cancel"))
+        return
+    if await _stored(update, lang, lambda: _store().set_pending(_chat_id(update), None)):
+        await _reply(update, t(lang, "cancelled"))
 
 
 # ---------- data commands ----------
@@ -278,15 +434,31 @@ async def _send_ai_text(update: Update, markdown: str):
             await _reply(update, html_to_plain(chunk))
 
 
+def _record_usage(update: Update, answer) -> None:
+    try:
+        _store().add_usage(_chat_id(update), _month(), answer.input_tokens, answer.output_tokens, answer.cost_usd)
+    except Exception as e:  # noqa: BLE001 - spending stats must never block the answer
+        logger.error("usage write failed: %s", e)
+
+
 async def _ai_reply(update: Update, prompt: str, label: str, task: str, **fmt):
-    lang = _lang(update)
+    user = _user(update)
+    lang = _lang(update, user)
+    mode = (user.get("settings") or {}).get("mode", DEFAULT_MODE)
+    try:
+        goal = _store().get_goal(_chat_id(update))
+    except Exception as e:  # noqa: BLE001
+        logger.error("goal read failed: %s", e)
+        goal = None
+    athlete = athlete_note(user.get("profile") or {}, goal, date.today())
     await _reply(update, t(lang, "ai.working", label=t(lang, f"ai.label.{label}")))
     try:
-        result = analyze(prompt, _context(_bq()), task, lang, **fmt)
-        if not result:
+        answer = analyze(prompt, _context(_bq()), task, lang, mode=mode, athlete=athlete, **fmt)
+        _record_usage(update, answer)
+        if not answer.text:
             await _reply(update, t(lang, "ai.error"))
             return
-        await _send_ai_text(update, result)
+        await _send_ai_text(update, answer.text)
     except Refused as e:
         logger.warning("Claude refused: %s", e)
         await _reply(update, t(lang, "ai.refused"))
@@ -311,12 +483,40 @@ async def cmd_nutrition(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Free-form question, e.g. "how did my last workout go?"."""
-    if await _guard(update):
-        await _ai_reply(update, ASK_PROMPT, "ask", "chat", question=update.message.text[:1000])
+    """An answer to a pending question (profile/goal input), otherwise a free-form question."""
+    if not await _guard(update):
+        return
+    user = _user(update)
+    pending = user.get("pending")
+    if pending:
+        lang = _lang(update, user)
+        try:
+            text, kb = handle_input(_store(), _chat_id(update), lang, pending, update.message.text, date.today())
+        except Exception as e:  # noqa: BLE001
+            logger.error("input handling failed: %s", e)
+            await _reply(update, t(lang, "storage.error"))
+            return
+        await _show(update, text, kb)
+        return
+    await _ai_reply(update, ASK_PROMPT, "ask", "chat", question=update.message.text[:1000])
+
+
+def _clears_pending(handler):
+    """A command interrupts any half-finished input, so the next text isn't taken as an answer."""
+    async def wrapped(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+        if _allowed(update) and _user(update).get("pending"):
+            try:
+                _store().set_pending(_chat_id(update), None)
+            except Exception as e:  # noqa: BLE001
+                logger.error("state write failed: %s", e)
+        await handler(update, ctx)
+    return wrapped
 
 
 COMMANDS = {
     "menu": cmd_menu, "today": cmd_today, "week": cmd_week, "coach": cmd_coach,
-    "health": cmd_health, "nutrition": cmd_nutrition, "status": cmd_status,
+    "health": cmd_health, "nutrition": cmd_nutrition, "goal": cmd_goal, "profile": cmd_profile,
+    "settings": cmd_settings, "status": cmd_status,
 }
+# What Telegram's command handlers call (button presses go through COMMANDS directly).
+COMMAND_HANDLERS = {**{k: _clears_pending(v) for k, v in COMMANDS.items()}, "cancel": cmd_cancel}
