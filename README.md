@@ -30,6 +30,9 @@ Claude Sonnet 5.5, roughly $0.015.
 
 ## Architecture
 
+Cloud resources keep the short technical prefix `fitness-` (`fitness-bot`, `fitness-collector`,
+dataset `fitness`), so existing installs update in place without recreating anything.
+
 ```
 Cloud Scheduler (every 4 h)
         │
