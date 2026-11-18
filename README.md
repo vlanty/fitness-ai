@@ -4,29 +4,67 @@
 
 # Second Wind
 
-*Второе дыхание.* A self-hosted Telegram bot, **Vita** (Вита), that collects your training and health data from the
-sources you choose (**Garmin Connect**, **Strava**, more can be added), stores it
-in **BigQuery**, and analyzes it with Claude as a coach, sports doctor and
-nutritionist.
+**A personal AI coach that lives in your Telegram.**
 
-**Cost: ~$1–2/month** for typical use. GCP usage fits the free tier; you pay for Claude
-API calls only — one question to the bot is about 4k input + 0.7k output tokens on
-Claude Sonnet 5.5, roughly $0.015.
+Meet **Vita**. She reads your Garmin and Strava data and answers like a coach, a sports doctor
+and a nutritionist who know your workouts, your sleep and your recovery.
+Ask in plain words and get an answer based on your own numbers, not generic advice.
 
-## What you get
+🔒 Runs in your own Google Cloud project, and only you can talk to her ·
+💸 about **$1–2 a month** · 🌍 Russian and English
 
-- Sync every few hours of activities and daily health (sleep, HRV, resting HR, stress, Body Battery, steps, VO2 max — depending on the source)
-- Telegram bot (answers only your chat) in **Russian or English**:
-  - just ask in any language — "how did my last workout go?", «как я спал вчера?» — the answer comes in the language of the question
-  - `/menu` (or `/start`) — buttons for everything below; the same commands are in Telegram's **Menu** list
-  - the bot's name follows the Telegram app language: **Вита · Второе дыхание** in Russian, **Vita · Second Wind** otherwise (set by the bot itself on start, no BotFather step)
-  - `/today` — last workout, latest health day, training load, readiness and training status (our own estimates)
-  - `/week` — current week summary
-  - `/coach`, `/health`, `/nutrition` — AI analysis
-  - `/status` — freshness of each data source
-- AI answers are formatted for Telegram: bold section headings, bullet lists, long answers split into several messages
-- Training load from Garmin's per-activity EPOC: acute / chronic load, load ratio, load focus, VO2 max trend
-- Full history on first install (`BACKFILL_FROM`), several sources merged without duplicates
+## What Vita does for you
+
+### 💬 Answers your questions
+> *"How did my last workout go?"* · *"Am I recovered enough for intervals today?"* · *"Why was my sleep so bad this week?"*
+
+Just type. Vita looks at your recent workouts, sleep, HRV, resting heart rate and stress,
+and replies in the language you asked in. If data is missing or out of date, she says so
+instead of guessing.
+
+### 🧠 Gives expert reviews in one tap
+| Command | What you get |
+|---|---|
+| 🏃 `/coach` | what went well, what didn't, what to change in your training |
+| ❤️ `/health` | recovery, fatigue and warning signs from HRV, resting HR, sleep and Body Battery |
+| 🥗 `/nutrition` | calories for training and rest days, what to eat before and after, hydration |
+
+### 📊 Shows your numbers instantly, without AI
+| Command | What you get |
+|---|---|
+| 📍 `/today` | last workout, last night, training load, **readiness** and **training status** |
+| 📅 `/week` | everything you did this week |
+| 🔄 `/status` | when each data source last synced, with a warning if one is stale |
+
+### 🎯 Knows who she is coaching
+| Command | What you get |
+|---|---|
+| 🎯 `/goal` | a race, its date and your target time; without a goal she coaches for steady progress |
+| 👤 `/profile` | age, weight, heart rate and injuries, so the advice fits you |
+
+### ⚙️ Lets you stay in control
+- `/settings`: menu language, AI mode (💰 Economy, ⚖️ Normal or 🧠 Maximum, each with its price shown) and how much the AI cost this month
+- `/menu` (or `/start`): all of the above as buttons; the same commands are in Telegram's **Menu** list
+- She answers your chat only and ignores everyone else
+
+### 🔄 Collects your data for you
+- Activities and daily health sync every 4 hours: sleep, HRV, resting HR, stress, Body Battery, steps and VO2 max, depending on the source
+- Garmin and Strava are merged without duplicates, and your full history is loaded on first install
+- Training load from Garmin's per-activity EPOC: acute and chronic load, load ratio, load focus and the VO2 max trend
+
+<details>
+<summary>What the AI costs, in detail</summary>
+
+Google Cloud usage fits the free tier, so you only pay for Claude API calls. One question is
+about 4k input + 0.7k output tokens on Claude Sonnet 5.5, roughly $0.015.
+</details>
+
+<details>
+<summary>Bot name in Telegram</summary>
+
+The bot sets its own name to match the Telegram app language: "Vita · Second Wind" by default and
+"Вита · Второе дыхание" for Russian. You don't need to change anything in BotFather.
+</details>
 
 ## Architecture
 
