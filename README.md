@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/avatar.png" alt="Fitness AI" width="200">
+</p>
+
 # Fitness AI
 
 A self-hosted Telegram bot that collects your training and health data from the
