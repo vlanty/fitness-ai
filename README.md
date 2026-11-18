@@ -19,6 +19,7 @@ Claude Sonnet 5.5, roughly $0.015.
 - Telegram bot (answers only your chat) in **Russian or English**:
   - just ask in any language — "how did my last workout go?", «как я спал вчера?» — the answer comes in the language of the question
   - `/menu` (or `/start`) — buttons for everything below; the same commands are in Telegram's **Menu** list
+  - the bot's name follows the Telegram app language: **Вита · Второе дыхание** in Russian, **Vita · Second Wind** otherwise (set by the bot itself on start, no BotFather step)
   - `/today` — last workout, latest health day, training load, readiness and training status (our own estimates)
   - `/week` — current week summary
   - `/coach`, `/health`, `/nutrition` — AI analysis
