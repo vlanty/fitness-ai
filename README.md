@@ -34,13 +34,17 @@ instead of guessing.
 |---|---|
 | 📍 `/today` | last workout, last night, training load, **readiness** and **training status** |
 | 📅 `/week` | everything you did this week |
+| 🗓 `/month` | this month so far next to the whole previous month: workouts by sport, time, running km, pace and heart rate, elevation, load, time in heart-rate zones |
+| ⚖️ `/compare` | this week, month, 4 weeks or year against the same stretch of time before it |
+| 🏅 `/records` | best 1 km, mile, 5 km, 10 km, half and marathon efforts, all-time and over 12 months |
+| 📈 `/charts` | pictures: weekly running volume, training load, overnight HRV against your normal range, resting heart rate, running efficiency (metres per heartbeat) |
 | 🔄 `/status` | when each data source last synced, with a warning if one is stale |
 
 ### 🎯 Knows who she is coaching
 | Command | What you get |
 |---|---|
 | 🎯 `/goal` | a race, its date and your target time; without a goal she coaches for steady progress |
-| 👤 `/profile` | age, weight, heart rate and injuries, so the advice fits you |
+| 👤 `/profile` | age, weight, heart rate, threshold and injuries, so the advice fits you; heart-rate zones come from your watch |
 
 ### ⚙️ Lets you stay in control
 - `/settings`: menu language, AI mode (💰 Economy, ⚖️ Normal or 🧠 Maximum, each with its price shown) and how much the AI cost this month
