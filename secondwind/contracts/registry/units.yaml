@@ -1,0 +1,29 @@
+# code: UCUM unit. dimension groups convertible units; to_canonical converts a value in this
+# unit to the canonical unit of its dimension: canonical = value * factor + offset.
+# delta_factor is used for differences (value_kind: delta): only the factor, never the offset.
+units:
+  - {code: "s",        dimension: time,          canonical: true}
+  - {code: "min",      dimension: time,          to_canonical: {factor: 60}}
+  - {code: "h",        dimension: time,          to_canonical: {factor: 3600}}
+  - {code: "ms",       dimension: time_short,    canonical: true}
+  - {code: "m",        dimension: length,        canonical: true}
+  - {code: "km",       dimension: length,        to_canonical: {factor: 1000}}
+  - {code: "/min",     dimension: rate,          canonical: true, description: "per minute (heart rate, breathing)"}
+  - {code: "/h",       dimension: event_rate,    canonical: true, description: "events per hour (AHI, ODI)"}
+  - {code: "s/km",     dimension: pace,          canonical: true}
+  - {code: "m/s",      dimension: speed,         canonical: true}
+  - {code: "kcal",     dimension: energy,        canonical: true}
+  - {code: "kJ",       dimension: energy,        to_canonical: {factor: 0.239005736}}
+  - {code: "mL/kg/min", dimension: vo2,          canonical: true}
+  - {code: "Cel",      dimension: temperature,   canonical: true}
+  - {code: "[degF]",   dimension: temperature,   to_canonical: {factor: 0.5555555556, offset: -17.7777777778}, delta_factor: 0.5555555556}
+  - {code: "%",        dimension: percent,       canonical: true}
+  - {code: "W",        dimension: power,         canonical: true}
+  - {code: "mm[Hg]",   dimension: pressure,      canonical: true}
+  - {code: "kg",       dimension: mass,          canonical: true}
+  - {code: "mg/dL",    dimension: glucose,       canonical: true, scope_metric: "glucose.*"}
+  - {code: "mmol/L",   dimension: glucose,       to_canonical: {factor: 18.0156}, scope_metric: "glucose.*"}
+  - {code: "{count}",  dimension: count,         canonical: true}
+  - {code: "{score}",  dimension: score,         canonical: true, description: "vendor scale; see the metric for its range"}
+  - {code: "{category}", dimension: category,    canonical: true, description: "text label"}
+  - {code: "1",        dimension: ratio,         canonical: true}

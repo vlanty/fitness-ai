@@ -5,3 +5,4 @@ anthropic==2.10.0
 google-cloud-bigquery==3.27.0
 google-cloud-firestore==2.34.1
 matplotlib==3.11.2
+PyYAML==6.0.2

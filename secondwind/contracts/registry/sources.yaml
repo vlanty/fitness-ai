@@ -1,0 +1,21 @@
+# Integrations. status: supported | planned | unsupported (kept to document why).
+#   ai_allowed:          data may be sent to the AI model
+#   storage_limit_days:  null = no limit from the vendor terms
+sources:
+  - code: garmin
+    status: supported
+    access: "Personal API key -> 24 h OAuth token (own data only)"
+    history: "≥25 months verified 2026-11-17"
+    ai_allowed: true
+    storage_limit_days: null
+  - code: strava
+    status: unsupported
+    access: "OAuth app"
+    ai_allowed: false
+    storage_limit_days: 7
+    notes: "API Policy 2026-06-01: no AI use (5.3), no transfer to AI providers (5.10), no combining (5.4), 7-day cache (6.2)"
+  - code: calculated
+    status: supported
+    access: "Second Wind modules"
+    ai_allowed: true
+    storage_limit_days: null

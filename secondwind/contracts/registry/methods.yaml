@@ -1,0 +1,20 @@
+# One entry per method code.
+#   metrics:   metric codes or prefixes ("hrv.*") this method may describe
+#   statistic, window: what was computed and over which period
+#   family:    methods in one family share a core module (still not directly comparable)
+#   evidence:  documented | inferred | unknown   (how sure we are what the vendor did)
+#   status:    active | deprecated
+methods:
+  - {code: rmssd_sleep_night_mean, metrics: ["hrv.*"], statistic: RMSSD, window: "main sleep, mean of 5-min windows", family: rmssd_overnight, evidence: inferred, description: "Garmin, Oura, Google; Garmin does not name the statistic in its API"}
+  - {code: garmin_hrv_baseline,    metrics: [hrv.baseline_low, hrv.baseline_high], statistic: "vendor balanced range", window: "~3 weeks", family: vendor_baseline, evidence: documented}
+  - {code: sdnn_spot,              metrics: ["hrv.*"], statistic: SDNN, window: "spot readings", family: sdnn_spot, evidence: documented, description: "Apple HealthKit heartRateVariabilitySDNN"}
+  - {code: lowest_30min_mean_24h,  metrics: [heart.resting], statistic: "lowest 30-min mean", window: "24 h", family: rhr_daily_min, evidence: inferred, description: "Garmin resting HR"}
+  - {code: vendor_sleep_staging,   metrics: ["sleep.*"], statistic: "vendor staging", window: "main sleep", family: sleep_vendor, evidence: documented}
+  - {code: vendor_daily_total,     metrics: [activity.steps, energy.active], statistic: sum, window: "calendar day", family: daily_total, evidence: documented}
+  - {code: vendor_daily_mean,      metrics: [resp.rate, spo2.mean], statistic: mean, window: "calendar day (vendor-defined)", family: daily_mean, evidence: unknown}
+  - {code: wearable_run_hr_pace,   metrics: [fitness.vo2max], statistic: "model estimate", window: "recent runs", family: vo2max_wearable, evidence: documented, description: "Firstbeat/Garmin and similar HR+pace models"}
+  - {code: session_summary,        metrics: ["workout.*"], statistic: "vendor session summary", window: session, family: session_summary, evidence: documented, description: "distance, durations, HR, pace, energy as reported for the session"}
+  - {code: garmin_epoc_load,       metrics: [workout.load], statistic: "EPOC-based load (Firstbeat)", window: session, family: garmin_epoc_load, evidence: documented}
+  - {code: garmin_fastest_split,   metrics: [workout.best_effort_time], statistic: "fastest split", window: session, family: best_effort_vendor, evidence: inferred, description: "raw_json fastestSplit_<meters>"}
+  - {code: garmin_time_in_zone,    metrics: [workout.time_in_hr_zone], statistic: "time in watch zones", window: session, family: tiz_vendor, evidence: inferred, description: "raw_json hrTimeInZone_<n>; bounds from the watch zones of that day"}
+  - {code: vendor_native,          metrics: ["vendor_score.*", "x.*"], statistic: "as reported", window: "as reported", family: vendor_native, evidence: unknown, description: "Proprietary scores and fields not mapped yet"}
