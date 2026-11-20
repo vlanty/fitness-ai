@@ -1,0 +1,38 @@
+# Messages answered with a fixed text, without the AI model. Patterns are Python regular
+# expressions, matched case-insensitively against the whole message. Order matters: the first
+# matching rule wins. Supported languages: ru, en (anything else gets lang.unsupported).
+rules:
+  - key: filter.red_flag          # possible emergency: never "coach" this
+    ru:
+      - 'бол\w* (в|за) груд'
+      - 'дав\w* (в|за) груд'
+      - '(колет|кольнуло|щемит) (в )?сердц'
+      - 'сердц\w* (колет|щемит|сбоит)'
+      - 'потерял\w* сознание|обморок'
+      - 'задыха\w*|не могу (вздохнуть|дышать)'
+      - 'кровь (в моче|в мокроте|в кале)'
+      - 'немеет (левая )?рук'
+      - 'аритми\w*|перебо\w* (в|сердц)'
+    en:
+      - 'chest (pain|tightness|pressure)'
+      - 'pain in (my )?chest'
+      - '(fainted|passed out|blacked out|lost consciousness)'
+      - "(short of breath|can'?t breathe|cannot breathe)"
+      - 'blood in (my )?(urine|stool|sputum)'
+      - '(left )?arm (is )?numb'
+      - '(irregular|skipping) heart ?beats?|arrhythmia'
+  - key: filter.thanks
+    ru: ['^\W*(спасибо|благодарю|спс|пасиб\w*)( большое| огромное)?\W*$']
+    en: ['^\W*(thanks|thank you|thx|cheers)( a lot| so much)?\W*$']
+  - key: filter.hello
+    ru: ['^\W*(привет|здравствуй\w*|добр\w+ (утро|день|вечер))\W*$']
+    en: ['^\W*(hi|hello|hey|good (morning|afternoon|evening))\W*$']
+  - key: filter.off_topic
+    ru:
+      - '(напиши|сочини) (мне )?(стих|песн|рассказ|сказк|код|программ)'
+      - '(расскажи|скажи) (мне )?(анекдот|шутку)'
+      - '(курс|прогноз) (доллара|евро|биткоин|акци)'
+    en:
+      - '(write|compose) (me )?(a )?(poem|song|story|code|program)'
+      - 'tell (me )?a joke'
+      - '(price|forecast) of (bitcoin|the dollar|stocks?)'

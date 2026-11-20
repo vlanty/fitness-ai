@@ -1,0 +1,32 @@
+# message -> expected outcome. Every implementation of the filter and router must pass these.
+# expect: filter key (filter.*), intent (calc.* / fact.*), or "model".
+cases:
+  - {text: "Спасибо!", lang: ru, expect: filter.thanks}
+  - {text: "привет", lang: ru, expect: filter.hello}
+  - {text: "thanks a lot", lang: en, expect: filter.thanks}
+  - {text: "У меня болит в груди после пробежки", lang: ru, expect: filter.red_flag}
+  - {text: "сердце колет на интервалах", lang: ru, expect: filter.red_flag}
+  - {text: "I fainted during the run", lang: en, expect: filter.red_flag}
+  - {text: "напиши стих про весну", lang: ru, expect: filter.off_topic}
+  - {text: "tell me a joke", lang: en, expect: filter.off_topic}
+  - {text: "Сколько я пробежал на этой неделе?", lang: ru, expect: fact.run_distance}
+  - {text: "сколько км в прошлом месяце", lang: ru, expect: fact.run_distance}
+  - {text: "How far did I run last week?", lang: en, expect: fact.run_distance}
+  - {text: "какой у меня пульс покоя сегодня", lang: ru, expect: fact.metric}
+  - {text: "сколько я спал вчера?", lang: ru, expect: fact.metric}
+  - {text: "what was my HRV yesterday", lang: en, expect: fact.metric}
+  - {text: "покажи мои рекорды", lang: ru, expect: fact.records}
+  - {text: "my personal records", lang: en, expect: fact.records}
+  - {text: "как прошла последняя тренировка?", lang: ru, expect: fact.last_workout}
+  - {text: "last run", lang: en, expect: fact.last_workout}
+  - {text: "какие у меня пульсовые зоны", lang: ru, expect: calc.zones}
+  - {text: "what are my heart rate zones", lang: en, expect: calc.zones}
+  - {text: "10 км за 50 минут какой темп", lang: ru, expect: calc.pace}
+  - {text: "темп 5:30 на 21.1 км", lang: ru, expect: calc.pace}
+  - {text: "10 km in 45 min pace?", lang: en, expect: calc.pace}
+  - {text: "почему у меня высокий пульс покоя?", lang: ru, expect: model}
+  - {text: "как улучшить сон?", lang: ru, expect: model}
+  - {text: "нормальный ли у меня HRV", lang: ru, expect: model}
+  - {text: "why is my HRV low", lang: en, expect: model}
+  - {text: "я восстановился для интервалов сегодня?", lang: ru, expect: model}
+  - {text: "составь план на неделю", lang: ru, expect: model}
