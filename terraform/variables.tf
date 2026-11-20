@@ -18,6 +18,27 @@ variable "data_sources" {
   }
 }
 
+variable "owner_user_id" {
+  description = "Internal id of the owner (solo mode): every data row and the bot state are keyed by it. Generated once by `scripts/setup.py config`; never change it on a running install."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_-]{8,64}$", var.owner_user_id))
+    error_message = "owner_user_id: 8–64 characters, letters, digits, - or _ (setup.py generates a UUID)."
+  }
+}
+
+variable "tenancy" {
+  description = "solo = one owner (the only mode today)."
+  type        = string
+  default     = "solo"
+
+  validation {
+    condition     = contains(["solo"], var.tenancy)
+    error_message = "tenancy: only \"solo\" is supported for now."
+  }
+}
+
 variable "retired_secrets" {
   description = "Секреты, которые больше не используются: остаются в Secret Manager с меткой status=retired, не удаляются."
   type        = list(string)

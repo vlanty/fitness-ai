@@ -150,6 +150,8 @@ module "cloud_run" {
   collector_secrets = local.collector_secrets
   bot_models        = var.bot_models
   bot_language      = var.bot_language
+  owner_user_id     = var.owner_user_id
+  tenancy           = var.tenancy
   depends_on        = [module.secrets, module.bigquery, google_artifact_registry_repository.repo]
 }
 

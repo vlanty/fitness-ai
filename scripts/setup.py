@@ -20,6 +20,7 @@ import subprocess
 import sys
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -84,12 +85,16 @@ def cmd_config(_args) -> None:
 
     if TFVARS.exists() and ask(f"{TFVARS.name} уже есть. Перезаписать? (y/N)", "N").lower() != "y":
         sys.exit("Оставил как есть.")
+    # The owner's id keys all data and the bot state: keep it if the install already has one.
+    old = re.search(r'^owner_user_id\s*=\s*"([^"]+)"', TFVARS.read_text(encoding="utf-8"), re.M) if TFVARS.exists() else None
+    owner_user_id = old.group(1) if old else str(uuid.uuid4())
     sources_hcl = ", ".join(f'"{s}"' for s in chosen)
     TFVARS.write_text(
         f'gcp_project_id = "{project}"\n'
         f'gcp_region     = "{region}"\n'
         f'data_sources   = [{sources_hcl}]\n'
         f'sync_schedule  = "{schedule}"\n'
+        f'owner_user_id  = "{owner_user_id}" # не меняйте: по нему хранятся все данные\n'
         "# retired_secrets = [] # секреты, которые больше не нужны: остаются, помечаются status=retired\n",
         encoding="utf-8")
     print(f"\n✔ Записан {TFVARS.relative_to(ROOT)} (в .gitignore)")

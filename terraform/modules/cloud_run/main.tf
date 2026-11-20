@@ -3,6 +3,8 @@ locals {
     { name = "GCP_PROJECT", value = var.project_id },
     { name = "BQ_DATASET", value = var.bq_dataset },
     { name = "DATA_SOURCES", value = join(",", var.data_sources) },
+    { name = "OWNER_USER_ID", value = var.owner_user_id },
+    { name = "TENANCY", value = var.tenancy },
   ]
   collector_env_vars = concat(local.common_env_vars, [
     { name = "RAW_BUCKET", value = var.raw_bucket },

@@ -11,6 +11,8 @@ variable "bot_models" {
   type    = map(string)
   default = {}
 }
+variable "owner_user_id" { type = string }
+variable "tenancy" { type = string }
 variable "bot_language" {
   type    = string
   default = ""

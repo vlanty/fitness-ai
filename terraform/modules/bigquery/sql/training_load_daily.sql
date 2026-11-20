@@ -5,8 +5,10 @@
 --   ratio   = acute / chronic; Garmin: < 0.8 low, 0.8–1.4 optimal, above = high
 --   focus   = 28-day load split by training-effect category (low/high aerobic, anaerobic)
 -- These are fitness-ai calculations from Garmin inputs, not Garmin's displayed values.
+-- Everything is computed per user (windows PARTITION BY user_id).
 WITH acts AS (
   SELECT
+    user_id,
     activity_date AS d,
     training_load AS load,
     CASE
@@ -21,28 +23,33 @@ WITH acts AS (
   WHERE training_load IS NOT NULL
 ),
 days AS (
-  SELECT d FROM UNNEST(GENERATE_DATE_ARRAY(
-    (SELECT IFNULL(MIN(d), CURRENT_DATE()) FROM acts), CURRENT_DATE())) AS d
+  SELECT u.user_id, d
+  FROM (SELECT user_id, MIN(d) AS first_d FROM acts GROUP BY user_id) AS u,
+       UNNEST(GENERATE_DATE_ARRAY(u.first_d, CURRENT_DATE())) AS d
 ),
 daily AS (
   SELECT
+    days.user_id,
     days.d,
     IFNULL(SUM(acts.load), 0) AS load,
     IFNULL(SUM(IF(acts.focus = 'low_aerobic', acts.load, 0)), 0) AS low_aerobic,
     IFNULL(SUM(IF(acts.focus = 'high_aerobic', acts.load, 0)), 0) AS high_aerobic,
     IFNULL(SUM(IF(acts.focus = 'anaerobic', acts.load, 0)), 0) AS anaerobic,
     COUNT(acts.d) AS activities
-  FROM days LEFT JOIN acts USING (d)
-  GROUP BY days.d
+  FROM days
+  LEFT JOIN acts ON acts.user_id IS NOT DISTINCT FROM days.user_id AND acts.d = days.d
+  GROUP BY days.user_id, days.d
 ),
 vo2 AS (
-  SELECT date AS d, vo2max FROM `${health}` WHERE vo2max IS NOT NULL
+  SELECT user_id, date AS d, vo2max FROM `${health}` WHERE vo2max IS NOT NULL
 ),
 daily_vo2 AS (
-  SELECT daily.*, vo2.vo2max AS vo2_today FROM daily LEFT JOIN vo2 USING (d)
+  SELECT daily.*, vo2.vo2max AS vo2_today
+  FROM daily LEFT JOIN vo2 ON vo2.user_id IS NOT DISTINCT FROM daily.user_id AND vo2.d = daily.d
 ),
 win AS (
   SELECT
+    user_id,
     d,
     load AS daily_load,
     activities,
@@ -52,16 +59,17 @@ win AS (
     SUM(high_aerobic) OVER w28 AS focus_high_aerobic_28d,
     SUM(anaerobic) OVER w28 AS focus_anaerobic_28d,
     COUNT(*) OVER w28 AS history_days,
-    MAX(IF(activities > 0, d, NULL)) OVER (ORDER BY UNIX_DATE(d) ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS last_activity_date,
+    MAX(IF(activities > 0, d, NULL)) OVER (PARTITION BY user_id ORDER BY UNIX_DATE(d) ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS last_activity_date,
     -- VO2 max is only recalculated on some days: carry the latest known value forward.
-    LAST_VALUE(vo2_today IGNORE NULLS) OVER (ORDER BY UNIX_DATE(d) RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS vo2max,
-    LAST_VALUE(vo2_today IGNORE NULLS) OVER (ORDER BY UNIX_DATE(d) RANGE BETWEEN UNBOUNDED PRECEDING AND 28 PRECEDING) AS vo2max_28d_ago
+    LAST_VALUE(vo2_today IGNORE NULLS) OVER (PARTITION BY user_id ORDER BY UNIX_DATE(d) RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS vo2max,
+    LAST_VALUE(vo2_today IGNORE NULLS) OVER (PARTITION BY user_id ORDER BY UNIX_DATE(d) RANGE BETWEEN UNBOUNDED PRECEDING AND 28 PRECEDING) AS vo2max_28d_ago
   FROM daily_vo2
   WINDOW
-    w7 AS (ORDER BY UNIX_DATE(d) RANGE BETWEEN 6 PRECEDING AND CURRENT ROW),
-    w28 AS (ORDER BY UNIX_DATE(d) RANGE BETWEEN 27 PRECEDING AND CURRENT ROW)
+    w7 AS (PARTITION BY user_id ORDER BY UNIX_DATE(d) RANGE BETWEEN 6 PRECEDING AND CURRENT ROW),
+    w28 AS (PARTITION BY user_id ORDER BY UNIX_DATE(d) RANGE BETWEEN 27 PRECEDING AND CURRENT ROW)
 )
 SELECT
+  win.user_id,
   win.d AS date,
   daily_load,
   activities,
