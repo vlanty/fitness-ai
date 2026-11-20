@@ -66,3 +66,17 @@ def test_memory_store_is_keyed_by_user_and_links_identities():
     st.link_identity("telegram:42", "u-1")
     assert st.get_user("u-1")["profile"] == {"weight": 70} and st.get_user("u-2") == {}
     assert st.get_usage("u-1", "2026-11")["calls"] == 1 and st.get_identity("telegram:42") == "u-1"
+
+
+def test_athlete_inputs_are_read_for_the_chat_user(monkeypatch):
+    calls = []
+
+    class Reader:
+        def get_athlete_inputs(self):
+            calls.append("read")
+            return {"resting_hr_7d": 47}
+
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "42")
+    monkeypatch.setenv("OWNER_USER_ID", "u-1")
+    monkeypatch.setattr(handlers, "_bq", lambda update: Reader())
+    assert handlers._athlete_inputs(Upd(42)) == {"resting_hr_7d": 47} and calls == ["read"]
