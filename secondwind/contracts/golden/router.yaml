@@ -39,3 +39,9 @@ cases:
   - {text: "recipe for chocolate cake", lang: en, expect: filter.off_topic}
   - {text: "что съесть перед длинной пробежкой?", lang: ru, expect: model}
   - {text: "забыл часы, как считать тренировку?", lang: ru, expect: model}
+  - {text: "прогноз на 10 км", lang: ru, expect: calc.race_predict}
+  - {text: "за сколько я пробегу полумарафон?", lang: ru, expect: calc.race_predict}
+  - {text: "на что я сейчас бегу марафон", lang: ru, expect: calc.race_predict}
+  - {text: "predict my marathon time", lang: en, expect: calc.race_predict}
+  - {text: "what could I run a 5k in", lang: en, expect: calc.race_predict}
+  - {text: "как мне пробежать марафон быстрее?", lang: ru, expect: model}

@@ -72,3 +72,26 @@ def test_run_distance_and_pace():
 def test_zones_without_data_ask_for_the_profile():
     text, kw = answer("какие у меня пульсовые зоны")
     assert kw == {"parse_mode": "HTML"} and text
+
+
+class RecordsReader(Reader):
+    def get_records(self, since):
+        return [{"d": 5000, "span": "recent", "activity_date": "2026-10-15", "name": "Parkrun", "secs": 1310.0},
+                {"d": 10000, "span": "recent", "activity_date": "2026-09-01", "name": "Tempo", "secs": 2760.0},
+                {"d": 5000, "span": "all", "activity_date": "2025-05-01", "name": "PB", "secs": 1250.0}]
+
+
+def test_race_prediction_uses_riegel_from_the_closest_recent_effort(monkeypatch):
+    monkeypatch.setattr(handlers, "_bq", lambda update: RecordsReader())
+    text = answer("прогноз на полумарафон")[0]
+    # Riegel from the recent 10 km (46:00): 2760 * (21.0975 / 10) ** 1.06 = 6094 s
+    assert "1:41:3" in text and "10 км" in text and "46:00" in text
+    assert "5 км" in answer("прогноз на 5 км")[0] or "21:50" in answer("прогноз на 5 км")[0]
+
+
+def test_race_prediction_without_efforts(monkeypatch):
+    class Empty(Reader):
+        def get_records(self, since):
+            return []
+    monkeypatch.setattr(handlers, "_bq", lambda update: Empty())
+    assert answer("прогноз на 10 км")[0]

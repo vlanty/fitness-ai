@@ -6,6 +6,9 @@ to_model:
   ru: ['почему|зачем|из-за чего|как (улучшить|поднять|снизить|исправить|восстановиться)|что (делать|посоветуешь)|нормальн\w*|стоит ли|можно ли|надо ли|нужно ли|план|совет|оцени|проанализируй|сравни']
   en: ["why|how (do|can|should) i (improve|raise|lower|fix|recover)|what should|normal|is it ok|should i|can i|plan|advice|analy[sz]e|compare|evaluate"]
 intents:
+  - intent: calc.race_predict
+    ru: ['прогноз\w*\W+(\w+\W+){0,3}(\d+([.,]\d+)?\s*(км|k)\b|марафон|полумарафон)', 'за сколько\W+(\w+\W+){0,2}(пробегу|пробежал бы|осилю)', 'на (какое время|что)\W+(\w+\W+){0,2}бегу']
+    en: ['predict\w*\W+(\w+\W+){0,3}(\d+(\.\d+)?\s*(km|k)\b|marathon|half)', 'what (time )?(could|can|would) i run', 'race (time )?prediction']
   - intent: calc.pace
     ru: ['\d+([.,]\d+)?\s*(км|k)\b.{0,12}\bза\s*\d', 'темп\w*\s*\d+[:.]\d\d', '\d+[:.]\d\d\s*(на|/)\s*км']
     en: ['\d+(\.\d+)?\s*(km|k)\b.{0,12}\bin\s*\d', 'pace (of )?\d+[:.]\d\d', '\d+[:.]\d\d\s*(per|/)\s*km']

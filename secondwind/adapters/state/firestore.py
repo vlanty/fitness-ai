@@ -70,6 +70,9 @@ class FirestoreStore:
         snap = self._doc(user_id).collection("usage").document(month).get()
         return (snap.to_dict() or {}) if snap.exists else {}
 
+    def update_guard(self, user_id, guard):
+        self._update(user_id, {"guard": guard})
+
     def get_identity(self, key):
         snap = self.db.collection("identities").document(key).get()
         return (snap.to_dict() or {}).get("user_id") if snap.exists else None
