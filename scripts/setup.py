@@ -111,7 +111,7 @@ def cmd_config(_args) -> None:
   terraform init -backend-config="bucket={bucket}"
   terraform apply -target=google_project_service.apis -target=google_artifact_registry_repository.repo -target=module.secrets
   python3 ../scripts/setup.py secrets
-  # соберите и загрузите образы (README, шаг «Деплой»), затем:
+  # соберите и загрузите образы (docs/setup.md, шаг 4), затем:
   terraform apply
   python3 ../scripts/setup.py webhook""")
 
