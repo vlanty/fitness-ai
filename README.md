@@ -2,284 +2,44 @@
   <img src="docs/avatar.png" alt="Vita, the Second Wind bot" width="200">
 </p>
 
-# Second Wind
+<h1 align="center">Second Wind</h1>
 
-**A personal AI coach that lives in your Telegram.**
+<p align="center">
+  <b>A personal AI coach that lives in your Telegram.</b><br>
+  🔒 your own Google Cloud project · 💸 about $1–2 a month · 🌍 Russian and English
+</p>
 
 Meet **Vita**. She reads your Garmin and Strava data and answers like a coach, a sports doctor
-and a nutritionist who know your workouts, your sleep and your recovery.
-Ask in plain words and get an answer based on your own numbers, not generic advice.
+and a nutritionist who know your workouts, your sleep and your recovery. Ask in plain words and
+get an answer based on your own numbers, not generic advice.
 
-🔒 Runs in your own Google Cloud project, and only you can talk to her ·
-💸 about **$1–2 a month** · 🌍 Russian and English
+## Highlights
 
-## What Vita does for you
-
-### 💬 Answers your questions
-> *"How did my last workout go?"* · *"Am I recovered enough for intervals today?"* · *"Why was my sleep so bad this week?"*
-
-Just type. Vita looks at your recent workouts, sleep, HRV, resting heart rate and stress,
-and replies in the language you asked in. If data is missing or out of date, she says so
+💬 **Ask anything.** *"Am I recovered enough for intervals today?"* Vita looks at your recent
+workouts, sleep, HRV, resting heart rate and stress. If data is missing or stale, she says so
 instead of guessing.
 
-### 🧠 Gives expert reviews in one tap
-| Command | What you get |
+🧠 **Expert reviews in one tap.** `/coach` for training, `/health` for recovery and warning
+signs, `/nutrition` for calories, fuelling and hydration.
+
+📊 **Your numbers instantly, without AI.** `/today` with readiness and training status, `/week`,
+`/month`, `/compare` against the previous period, `/records` for best efforts from 1 km to the
+marathon, and `/charts` for volume, load, HRV, resting HR and running efficiency.
+
+🎯 **Coaching that fits you.** Set a race goal with `/goal`, and your age, weight, threshold and
+injuries with `/profile`. Heart-rate zones come straight from your watch.
+
+🔄 **Data collects itself.** Garmin and Strava sync every 4 hours, are merged without duplicates,
+and your full history is loaded on first install.
+
+⚙️ **You stay in control.** Pick the AI mode and see what it costs this month in `/settings`.
+Only your chat gets answers, and your data never leaves your own cloud project.
+
+## Documentation
+
+| | |
 |---|---|
-| 🏃 `/coach` | what went well, what didn't, what to change in your training |
-| ❤️ `/health` | recovery, fatigue and warning signs from HRV, resting HR, sleep and Body Battery |
-| 🥗 `/nutrition` | calories for training and rest days, what to eat before and after, hydration |
-
-### 📊 Shows your numbers instantly, without AI
-| Command | What you get |
-|---|---|
-| 📍 `/today` | last workout, last night, training load, **readiness** and **training status** |
-| 📅 `/week` | everything you did this week |
-| 🗓 `/month` | this month so far next to the whole previous month: workouts by sport, time, running km, pace and heart rate, elevation, load, time in heart-rate zones |
-| ⚖️ `/compare` | this week, month, 4 weeks or year against the same stretch of time before it |
-| 🏅 `/records` | best 1 km, mile, 5 km, 10 km, half and marathon efforts, all-time and over 12 months |
-| 📈 `/charts` | pictures: weekly running volume, training load, overnight HRV against your normal range, resting heart rate, running efficiency (metres per heartbeat) |
-| 🔄 `/status` | when each data source last synced, with a warning if one is stale |
-
-### 🎯 Knows who she is coaching
-| Command | What you get |
-|---|---|
-| 🎯 `/goal` | a race, its date and your target time; without a goal she coaches for steady progress |
-| 👤 `/profile` | age, weight, heart rate, threshold and injuries, so the advice fits you; heart-rate zones come from your watch |
-
-### ⚙️ Lets you stay in control
-- `/settings`: menu language, AI mode (💰 Economy, ⚖️ Normal or 🧠 Maximum, each with its price shown) and how much the AI cost this month
-- `/menu` (or `/start`): all of the above as buttons; the same commands are in Telegram's **Menu** list
-- She answers your chat only and ignores everyone else
-
-### 🔄 Collects your data for you
-- Activities and daily health sync every 4 hours: sleep, HRV, resting HR, stress, Body Battery, steps and VO2 max, depending on the source
-- Garmin and Strava are merged without duplicates, and your full history is loaded on first install
-- Training load from Garmin's per-activity EPOC: acute and chronic load, load ratio, load focus and the VO2 max trend
-
-<details>
-<summary>What the AI costs, in detail</summary>
-
-Google Cloud usage fits the free tier, so you only pay for Claude API calls. One question is
-about 4k input + 0.7k output tokens on Claude Sonnet 5.5, roughly $0.015.
-</details>
-
-<details>
-<summary>Bot name in Telegram</summary>
-
-The bot sets its own name to match the Telegram app language: "Vita · Second Wind" by default and
-"Вита · Второе дыхание" for Russian. You don't need to change anything in BotFather.
-</details>
-
-## Architecture
-
-Cloud resources keep the short technical prefix `fitness-` (`fitness-bot`, `fitness-collector`,
-dataset `fitness`), so existing installs update in place without recreating anything.
-
-```
-Cloud Scheduler (every 4 h)
-        │
-        ▼
-Cloud Run Job "collector"  ── DATA_SOURCES=garmin,strava (order = priority)
-        │   sources/garmin.py ── Garmin Personal API (personal key → 24 h token)
-        │   sources/strava.py ── Strava API (OAuth refresh token)
-        ├── raw files (.FIT) ──► GCS bucket <project>-fitness-raw
-        ▼
-BigQuery dataset "fitness"
-  tables: activities, health_daily      (one row per source + id/day, MERGE = idempotent)
-          ingest_state                  (cursor and last status per source)
-  views:  activities_unified            (duplicates across sources removed)
-          health_daily_unified          (each field from the highest-priority source)
-          training_load_daily           (acute/chronic load, ratio, focus, VO2 max trend)
-        │
-        ▼
-Cloud Run Service "bot" (Telegram webhook, owner chat only)
-        ├── bot/estimates.py ── readiness & training status (our estimates)
-        ├── bot/locales/    ── texts in ru / en
-        ├── bot/models.py   ── which Claude model does which task
-        └── Claude API      (Sonnet 5.5 for questions and analysis, Haiku 5.5 for routine messages)
-
-Secrets: Secret Manager (values never in Terraform)   State: GCS bucket <project>-tfstate
-```
-
-## Data sources
-
-You pick sources at setup (`data_sources` in `terraform.tfvars`). **Order = priority.**
-
-| Source | Data | Credentials |
-|---|---|---|
-| `garmin` | activities (+ original .FIT), sleep, HRV, stress, Body Battery, resting HR, steps, VO2 max | Personal API key |
-| `strava` | activities only | OAuth app + refresh token |
-
-### Several sources at once
-
-- Each source is pulled separately with its own cursor; one failing does not stop the others, but the job run is marked failed and the bot shows a warning.
-- Tables keep everything that arrived (`source` column, key `source + id/date`).
-- `activities_unified` removes duplicates: the same workout from two sources = start time within **±5 min** and moving *or* elapsed duration within **10 %**. The row from the source listed first in `data_sources` is kept; `also_in` shows where else it was found. Sources no longer enabled (e.g. old Strava history) rank last but their unique workouts stay visible.
-- `health_daily_unified` takes each field per day from the highest-priority source that has it.
-
-### Garmin Connect (official Personal API)
-
-- Docs: [Personal API](https://developer.garmin.com/gc-developer-program/personal/personal-api/), [FAQ](https://developer.garmin.com/gc-developer-program/personal/personal-faq/).
-- Create a key at [connect.garmin.com → Personal API Token](https://connect.garmin.com/app/settings/personalApiToken). It is shown once; validity 30 / 90 / 180 days or 1 year; Garmin emails ~a week before expiry.
-- The collector exchanges the key for a 24-hour bearer token on every run (no refresh tokens exist).
-- **Limits:** Garmin does not publish rate limits and sends no rate-limit headers; no 429 was seen while testing. The collector paces requests (≥0.5 s apart), retries 429/5xx with exponential backoff (honours `Retry-After`), downloads at most `FIT_DOWNLOAD_LIMIT` (50) .FIT files per run and reads health in 28-day ranges: one window = activity list + 4 health requests (+ .FIT downloads).
-- **History:** the API returns old data — activities and daily health from at least 25 months back were available when tested (as far back as the account has data).
-- **What you get** (checked with `scripts/garmin_probe.py`):
-
-  | Data | Available |
-  |---|---|
-  | Sleep: duration, phases, score, start/end | ✅ |
-  | HRV: last night, 7-day avg, status | ✅ |
-  | Resting HR, stress, Body Battery (min/max/charged/drained), steps, active calories, respiration | ✅ (daily summary) |
-  | VO2 max | ✅ on days Garmin recalculates it (health API; not in .FIT) |
-  | Activity: HR, pace, aerobic/anaerobic training effect, training load | ✅ |
-  | Original .FIT file | ✅ (ZIP) |
-  | Daily average SpO2 | ❌ |
-  | Training readiness, training status | ❌ (404) |
-  | Recovery time, performance condition | ❌ only inside undocumented .FIT message 140, not decoded |
-
-  Run `python3 scripts/garmin_probe.py` with your key to check your own account.
-
-### Training load and estimates (computed by Second Wind)
-
-Garmin's readiness / status models are closed, but their inputs are documented and the
-heavy part — per-activity EPOC load and training effect — comes from Garmin itself.
-
-- View `training_load_daily`: acute load (7-day sum of `training_load`), chronic load
-  (weekly average over 28 days), load ratio with Garmin's bands (< 0.8 low, 0.8–1.4 optimal,
-  above high), 28-day load focus (low aerobic / high aerobic / anaerobic from
-  `trainingEffectLabel`), VO2 max and its 28-day change.
-- HRV personal range (`hrv_baseline_low/high`) from Garmin's HRV baseline.
-- Bot shows **readiness** (0–100) and **training status** as *our own estimates, not Garmin
-  values* — transparent rules in `bot/estimates.py` over the same inputs Garmin lists
-  (readiness: sleep score, 3-night sleep, HRV vs baseline, load ratio, 3-day stress — without
-  recovery time; status: VO2 max trend, load ratio, HRV status).
-- Recovery time and performance condition are not estimated.
-- **Heart-rate zones** are the ones your watch uses: the collector reads them from each new
-  .FIT file (`time_in_zone`: zone bounds, method — % of lactate threshold / max HR / HR
-  reserve — and the threshold HR), so the bot's zones match the watch and Garmin's time in
-  zone. Without them (e.g. Strava only) the bot falls back to the threshold from `/profile`
-  (Friel), then Karvonen (resting HR from Garmin's 7-day average), then % of max HR.
-  `/profile` also shows how the threshold on the watch changed over ~3 months.
-- Personal use only: the Personal API is for your own data, not for serving other users.
-
-**Rotate / re-issue the key** (expired, lost or leaked):
-
-1. On the Garmin page delete the old key (this also invalidates its tokens) and create a new one.
-2. `python3 scripts/setup.py secrets --update garmin_personal_api_key`
-3. Nothing else: the next collector run picks up the `latest` version.
-
-### Strava
-
-1. [strava.com/settings/api](https://www.strava.com/settings/api): create an app (callback domain `localhost`).
-2. `python3 scripts/strava_auth.py` prints a refresh token.
-3. Enter Client ID, Client Secret and the refresh token in `setup.py secrets`.
-
-If Strava starts returning `400` on `/oauth/token`, the token was revoked: re-run `strava_auth.py` and `setup.py secrets --update strava_refresh_token`.
-
-## Bot settings
-
-Optional, in `terraform/terraform.tfvars`, then `terraform apply`:
-
-| Variable | Default | What it does |
-|---|---|---|
-| `bot_language` | `""` | Language of menus, buttons and commands: `ru` or `en`. Empty = each user's Telegram app language (English if it's neither). Free-form answers always follow the language of the question. |
-| `bot_models` | `{}` | Claude model per task, e.g. `{ chat = "claude-opus-5-5" }`. Tasks: `chat` (free-form questions), `analysis` (`/coach` `/health` `/nutrition`) — default `claude-sonnet-5-5`; `weekly`, `alerts`, `morning` (planned routine messages) — default `claude-haiku-5-5`. |
-
-Model names are never shown to bot users. To add a language, copy `bot/locales/en.json`
-to `<code>.json`, translate the values and keep the keys.
-
-**Secrets in logs.** The bot never writes the Telegram token or the Anthropic key to the
-logs: request URLs are not logged, and `bot/log_safety.py` masks anything token-shaped in
-every log line and traceback.
-
-## Setup
-
-Prerequisites: [Google Cloud CLI](https://cloud.google.com/sdk/docs/install), [Terraform ≥ 1.7](https://developer.hashicorp.com/terraform/install), [Docker](https://docs.docker.com/engine/install/), Python 3.10+.
-
-```bash
-git clone https://github.com/YOUR_USERNAME/second-wind.git && cd second-wind
-gcloud auth login && gcloud auth application-default login
-gcloud config set project YOUR_PROJECT_ID     # billing must be enabled
-```
-
-1. **Configure** — project, region, data sources, schedule; creates the state bucket:
-   ```bash
-   python3 scripts/setup.py config
-   ```
-2. **Base infrastructure:**
-   ```bash
-   cd terraform
-   terraform init -backend-config="bucket=YOUR_PROJECT_ID-tfstate"
-   terraform apply -target=google_project_service.apis -target=google_artifact_registry_repository.repo -target=module.secrets
-   ```
-3. **Secret values** (hidden input, sent straight to Secret Manager):
-   ```bash
-   python3 ../scripts/setup.py secrets
-   ```
-4. **Images and the rest:**
-   ```bash
-   REGION=europe-west3; BASE="${REGION}-docker.pkg.dev/$(gcloud config get-value project)/fitness-ai"
-   gcloud auth configure-docker ${REGION}-docker.pkg.dev
-   docker build --platform linux/amd64 -t ${BASE}/collector:latest ../collector && docker push ${BASE}/collector:latest
-   docker build --platform linux/amd64 -t ${BASE}/bot:latest ../bot && docker push ${BASE}/bot:latest
-   terraform apply
-   python3 ../scripts/setup.py webhook
-   ```
-5. **History** (optional, one-off):
-   ```bash
-   gcloud run jobs execute fitness-collector --region europe-west3 --update-env-vars BACKFILL_FROM=2024-01-01
-   ```
-
-Secret values never go into `terraform.tfvars` or Terraform state; Terraform only manages the secret containers.
-
-## Updating
-
-```bash
-docker build --platform linux/amd64 -t ${BASE}/collector:latest ./collector && docker push ${BASE}/collector:latest
-docker build --platform linux/amd64 -t ${BASE}/bot:latest ./bot && docker push ${BASE}/bot:latest
-gcloud run services update fitness-bot --region europe-west3 --image ${BASE}/bot:latest
-```
-
-The bot URL (and so the Telegram webhook) does not change between revisions. Roll back with
-`gcloud run services update-traffic fitness-bot --region europe-west3 --to-revisions PREVIOUS_REVISION=100`.
-
-Activities stored before the collector learned to read HR zones from .FIT files get them with a
-one-off, re-runnable script (it reads the archives already in the raw bucket):
-`python3 scripts/backfill_fit_zones.py --project YOUR_PROJECT_ID` (add `--dry-run` to only look).
-
-Changing sources = edit `data_sources`, `terraform apply`, `setup.py secrets`. Secrets you no longer
-use go to `retired_secrets`: they are kept and labelled `status=retired`, never deleted.
-
-## Adding a data source
-
-1. `collector/sources/<name>.py`: subclass `Source`, set `name` and `required_env`, implement `fetch(start, end, known_ids) -> Batch` returning rows for `activities` / `health_daily` (see `sources/base.py`).
-2. Register it in `collector/sources/__init__.py`.
-3. Terraform: add its secrets to `local.source_secrets` (`terraform/main.tf`) and the name to the `data_sources` validation.
-4. `scripts/setup.py`: add it to `SOURCES` and its secrets to `SECRET_HELP`; document it above.
-
-## Troubleshooting
-
-```bash
-gcloud run jobs executions list --job fitness-collector --region europe-west3 --limit 5
-gcloud logging read 'resource.labels.job_name="fitness-collector" AND severity>=WARNING' --freshness=1d --limit 20
-gcloud run services logs read fitness-bot --region europe-west3 --limit=50
-```
-
-- **Garmin 401/403 on token** — the key expired or was deleted: see “Rotate the key”.
-- **Bot silent, no `POST /webhook` in its logs** — Telegram is not delivering. Run `python3 scripts/setup.py webhook`; this is needed after every token rotation (below), because Telegram drops the webhook when a token is revoked.
-- **Bot silent, `rejected chat <id>` in its logs** — it answers only the chat in `telegram_chat_id`. If that id is yours, store it and roll out a fresh revision (secrets are read at instance start):
-  ```bash
-  gcloud run services logs read fitness-bot --region europe-west3 --limit=50 | grep "rejected chat"
-  python3 scripts/setup.py secrets --update telegram_chat_id
-  gcloud run services update fitness-bot --region europe-west3 --revision-suffix chatid-$(date +%s)
-  ```
-- **Rotate the Telegram bot token** (leaked or lost) — copy the whole new token, digits before the colon included:
-  1. @BotFather → `/revoke` → choose the bot → new token.
-  2. `python3 scripts/setup.py secrets --update telegram_bot_token`, then disable the old version: `gcloud secrets versions disable OLD_VERSION --secret telegram_bot_token`.
-  3. `gcloud run services update fitness-bot --region europe-west3 --revision-suffix token-$(date +%s)` — new instances read the new token.
-  4. `python3 scripts/setup.py webhook` — revoking the token removed the webhook.
-
-  If the bot fails to start with `Telegram rejected the bot token`, the stored value is wrong (often a digit lost when pasting): store it again and repeat step 3.
-- **Roll back the bot** — `gcloud run revisions list --service fitness-bot --region europe-west3`, then `gcloud run services update-traffic fitness-bot --region europe-west3 --to-revisions REVISION=100`.
-- `/status` in the bot shows the last successful sync per source.
+| 🚀 [Setup](docs/setup.md) | install in your Google Cloud project, connect Garmin and Strava, bot settings |
+| 🛠 [Operations](docs/operations.md) | updating, rotating keys and tokens, troubleshooting |
+| 🔬 [How it works](docs/how-it-works.md) | architecture, merging sources, how load, readiness, status and zones are calculated |
+| 🤖 [Commands](docs/commands.md) | every bot command and what it shows |
