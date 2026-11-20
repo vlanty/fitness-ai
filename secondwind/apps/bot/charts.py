@@ -16,7 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.dates as mdates  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 
-from i18n import t  # noqa: E402
+from secondwind.core.i18n import t  # noqa: E402
 
 SURFACE = "#0f1f3a"
 TEXT = "#f0efec"

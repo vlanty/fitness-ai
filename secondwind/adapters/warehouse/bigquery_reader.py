@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from google.cloud import bigquery
 
-from i18n import t
+from secondwind.core.i18n import t
 
 STALE_AFTER = timedelta(hours=26)
 # Garmin keeps separate HR zones per sport; running ones go first.

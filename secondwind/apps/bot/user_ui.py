@@ -10,11 +10,11 @@ from datetime import date
 
 from telegram import InlineKeyboardButton as Btn, InlineKeyboardMarkup as Kb
 
-from athlete import (DISTANCES, PROFILE_FIELDS, InvalidInput, active_goal, fmt_duration, fmt_km, fmt_pace,
+from secondwind.core.athlete import (DISTANCES, PROFILE_FIELDS, InvalidInput, active_goal, fmt_duration, fmt_km, fmt_pace,
                      Zones, compute_zones, parse_date, parse_distance, parse_duration, parse_profile_value)
-from i18n import SUPPORTED, t
-from models import DEFAULT_MODE, MODES
-from state import StateStore
+from secondwind.core.i18n import SUPPORTED, t
+from secondwind.core.models import DEFAULT_MODE, MODES
+from secondwind.adapters.state.firestore import StateStore
 
 LANG_CHOICES = ("auto", *SUPPORTED)
 

@@ -5,7 +5,7 @@ A source turns a date range into normalized rows:
   * health_daily -> table `health_daily` (key: source + date)
   * files        -> raw files (e.g. .FIT) stored in GCS, optional
 
-To add a source: create collector/sources/<name>.py with a class that
+To add a source: create secondwind/apps/collector/sources/<name>.py with a class that
 subclasses Source, register it in sources/__init__.py, list its secrets in
 terraform (local.source_secrets) and document it in docs/setup.md (see docs/how-it-works.md).
 """

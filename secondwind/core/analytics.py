@@ -9,8 +9,8 @@ from __future__ import annotations
 import html
 from datetime import date, timedelta
 
-from athlete import fmt_duration, fmt_pace
-from i18n import t
+from secondwind.core.athlete import fmt_duration, fmt_pace
+from secondwind.core.i18n import t
 
 RECORD_KEYS = {1000: "1k", 1609: "mile", 5000: "5k", 10000: "10k", 21098: "half", 42195: "marathon"}
 COMPARE_SPANS = ("week", "month", "4w", "year")

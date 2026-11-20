@@ -8,18 +8,18 @@ from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 from telegram.helpers import escape_markdown
 
-from bq_reader import BigQueryReader, stale_warnings
-from claude_client import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, NUTRITION_PROMPT, Refused, analyze
-import analytics
-import charts
-from athlete import DISTANCES, PROFILE_FIELDS, athlete_note, compute_zones
-from estimates import readiness, training_status
-from i18n import SUPPORTED, resolve, t
-from models import DEFAULT_MODE
-from state import FirestoreStore, StateStore
-from user_ui import (apply_setting, ask_text, distance_keyboard, handle_input, render_goal, render_profile,
+from secondwind.adapters.warehouse.bigquery_reader import BigQueryReader, stale_warnings
+from secondwind.adapters.llm.claude import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, NUTRITION_PROMPT, Refused, analyze
+from secondwind.core import analytics
+from secondwind.apps.bot import charts
+from secondwind.core.athlete import DISTANCES, PROFILE_FIELDS, athlete_note, compute_zones
+from secondwind.core.estimates import readiness, training_status
+from secondwind.core.i18n import SUPPORTED, resolve, t
+from secondwind.core.models import DEFAULT_MODE
+from secondwind.adapters.state.firestore import FirestoreStore, StateStore
+from secondwind.apps.bot.user_ui import (apply_setting, ask_text, distance_keyboard, handle_input, render_goal, render_profile,
                      render_settings)
-from tg_format import html_to_plain, md_to_html, split_message
+from secondwind.apps.bot.tg_format import html_to_plain, md_to_html, split_message
 
 logger = logging.getLogger(__name__)
 

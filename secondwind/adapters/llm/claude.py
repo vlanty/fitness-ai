@@ -8,8 +8,8 @@ from dataclasses import dataclass
 
 import anthropic
 
-from i18n import language_name
-from models import DEFAULT_MODE, cost_usd, effort_for, model_for, supports_fallback
+from secondwind.core.i18n import language_name
+from secondwind.core.models import DEFAULT_MODE, cost_usd, effort_for, model_for, supports_fallback
 
 logger = logging.getLogger(__name__)
 

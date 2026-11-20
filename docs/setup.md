@@ -48,8 +48,8 @@ gcloud config set project YOUR_PROJECT_ID
    REGION=europe-west3   # your region from `setup.py config`
    BASE="${REGION}-docker.pkg.dev/$(gcloud config get-value project)/fitness-ai"
    gcloud auth configure-docker ${REGION}-docker.pkg.dev
-   docker build --platform linux/amd64 -t ${BASE}/collector:latest ../collector && docker push ${BASE}/collector:latest
-   docker build --platform linux/amd64 -t ${BASE}/bot:latest ../bot && docker push ${BASE}/bot:latest
+   docker build --platform linux/amd64 -f ../secondwind/apps/collector/Dockerfile -t ${BASE}/collector:latest .. && docker push ${BASE}/collector:latest
+   docker build --platform linux/amd64 -f ../secondwind/apps/bot/Dockerfile -t ${BASE}/bot:latest .. && docker push ${BASE}/bot:latest
    terraform apply
    python3 ../scripts/setup.py webhook
    ```
@@ -109,5 +109,5 @@ Optional, in `terraform/terraform.tfvars`, then `terraform apply`:
 
 Model names are never shown to bot users.
 
-**Adding a language:** copy `bot/locales/en.json` to `<code>.json`, translate the values and keep
+**Adding a language:** copy `secondwind/core/locales/en.json` to `<code>.json`, translate the values and keep
 the keys.

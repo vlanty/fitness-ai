@@ -24,7 +24,7 @@ locals {
   # Secrets every deployment needs.
   core_secrets = ["telegram_bot_token", "telegram_chat_id", "anthropic_api_key"]
 
-  # Secrets per data source. Add a new source here (and in collector/sources).
+  # Secrets per data source. Add a new source here (and in secondwind/apps/collector/sources).
   source_secrets = {
     garmin = ["garmin_personal_api_key"]
     strava = ["strava_client_id", "strava_client_secret", "strava_refresh_token"]

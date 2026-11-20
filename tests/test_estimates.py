@@ -1,9 +1,7 @@
 from datetime import date
 
-import estimates as e
-import handlers
-
-
+from secondwind.core import estimates as e
+from secondwind.apps.bot import handlers
 def day(**kw):
     base = {"sleep_score": 80, "stress_avg": 25, "hrv_last_night": 55, "hrv_baseline_low": 50,
             "hrv_baseline_high": 65, "hrv_status": "BALANCED"}

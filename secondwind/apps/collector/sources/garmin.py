@@ -20,7 +20,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import requests
 
-from fit_zones import extract_zones
+from secondwind.apps.collector.fit_zones import extract_zones
 
 from .base import Batch, PartialFetch, RawFile, Source, to_json
 

@@ -8,8 +8,8 @@ from telegram import Update
 from telegram.error import InvalidToken
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
-import log_safety
-from handlers import COMMAND_HANDLERS, _clears_pending, cmd_start, on_button, on_text, setup_menu
+from secondwind.apps.bot import log_safety
+from secondwind.apps.bot.handlers import COMMAND_HANDLERS, _clears_pending, cmd_start, on_button, on_text, setup_menu
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 # httpx logs every request URL at INFO, and Telegram URLs contain the bot token.

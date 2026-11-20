@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 
-from i18n import t
+from secondwind.core.i18n import t
 
 READINESS_BANDS = [(95, "excellent"), (75, "high"), (50, "moderate"), (25, "low"), (0, "poor")]
 READINESS_WEIGHTS = {"sleep": 0.25, "sleep_3n": 0.15, "hrv": 0.25, "load": 0.20, "stress_3d": 0.15}

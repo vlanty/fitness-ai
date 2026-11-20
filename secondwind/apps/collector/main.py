@@ -18,9 +18,9 @@ import os
 import sys
 from datetime import date, timedelta
 
-from bq_writer import BigQueryWriter
-from sources import REGISTRY, Batch, PartialFetch
-from state import IngestState
+from secondwind.adapters.warehouse.bigquery_writer import BigQueryWriter
+from secondwind.apps.collector.sources import REGISTRY, Batch, PartialFetch
+from secondwind.adapters.warehouse.ingest_state import IngestState
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("collector")
