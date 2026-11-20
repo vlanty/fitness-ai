@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 
-from secondwind.adapters.warehouse.bigquery_reader import stale_warnings
+from secondwind.core.freshness import stale_warnings
 from secondwind.apps.bot import handlers
 NOW = datetime(2026, 11, 17, 12, tzinfo=timezone.utc)
 

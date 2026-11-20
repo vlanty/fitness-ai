@@ -8,15 +8,18 @@ from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 from telegram.helpers import escape_markdown
 
-from secondwind.adapters.warehouse.bigquery_reader import BigQueryReader, stale_warnings
-from secondwind.adapters.llm.claude import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, NUTRITION_PROMPT, Refused, analyze
+from secondwind.adapters.llm.claude import ClaudeLLM
+from secondwind.adapters.warehouse.bigquery_reader import BigQueryReader
+from secondwind.core.assistant import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, NUTRITION_PROMPT, Refused, analyze
+from secondwind.core.freshness import stale_warnings
+from secondwind.core.ports import LLM, DataReader, StateStore
 from secondwind.core import analytics
 from secondwind.apps.bot import charts
 from secondwind.core.athlete import DISTANCES, PROFILE_FIELDS, athlete_note, compute_zones
 from secondwind.core.estimates import readiness, training_status
 from secondwind.core.i18n import SUPPORTED, resolve, t
 from secondwind.core.models import DEFAULT_MODE
-from secondwind.adapters.state.firestore import FirestoreStore, StateStore
+from secondwind.adapters.state.firestore import FirestoreStore
 from secondwind.apps.bot.user_ui import (apply_setting, ask_text, distance_keyboard, handle_input, render_goal, render_profile,
                      render_settings)
 from secondwind.apps.bot.tg_format import html_to_plain, md_to_html, split_message
@@ -34,7 +37,7 @@ MENU_BUTTONS = [["today", "week"], ["month", "compare"], ["records", "charts"], 
                 ["nutrition", "goal"], ["profile", "settings"], ["status"]]
 
 
-def _bq():
+def _bq() -> DataReader:
     return BigQueryReader(os.environ["GCP_PROJECT"], os.environ["BQ_DATASET"])
 
 
@@ -56,6 +59,11 @@ def _allowed(update: Update) -> bool:
 @lru_cache(maxsize=1)
 def _store() -> StateStore:
     return FirestoreStore(os.environ["GCP_PROJECT"])
+
+
+@lru_cache(maxsize=1)
+def _llm() -> LLM:
+    return ClaudeLLM()
 
 
 def _chat_id(update: Update) -> int:
@@ -171,7 +179,7 @@ def _estimates(health, load, lang) -> str:
             + training_status(load, health, lang=lang).text(t(lang, "est.status")))
 
 
-def _context(bq: BigQueryReader) -> str:
+def _context(bq: DataReader) -> str:
     """Data block for Claude: what we have, plus explicit gaps. Always in English."""
     lang = CONTEXT_LANG
     last = bq.get_last_activity()
@@ -558,7 +566,7 @@ async def _ai_reply(update: Update, prompt: str, label: str, task: str, **fmt):
                            garmin_resting_hr=inputs.get("resting_hr_7d"), lthr_then=lthr_then)
     await _reply(update, t(lang, "ai.working", label=t(lang, f"ai.label.{label}")))
     try:
-        answer = analyze(prompt, _context(_bq()), task, lang, mode=mode, athlete=athlete, **fmt)
+        answer = analyze(_llm(), prompt, _context(_bq()), task, lang, mode=mode, athlete=athlete, **fmt)
         _record_usage(update, answer)
         if not answer.text:
             await _reply(update, t(lang, "ai.error"))

@@ -33,7 +33,7 @@ BigQuery dataset "fitness"
 Cloud Run Service "bot" (Telegram webhook, owner chat only)
         ├── secondwind/core/estimates.py ── readiness & training status (our estimates)
         ├── secondwind/core/locales/     ── texts in ru / en
-        ├── secondwind/core/models.py    ── which Claude model does which task
+        ├── secondwind/core/models.py    ── which model tier does which task
         └── Claude API      (Sonnet 5.5 for questions and analysis, Haiku 5.5 for routine messages)
 
 Secrets: Secret Manager (values never in Terraform)   State: GCS bucket <project>-tfstate

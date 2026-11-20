@@ -21,6 +21,7 @@ from datetime import date, timedelta
 from secondwind.adapters.warehouse.bigquery_writer import BigQueryWriter
 from secondwind.apps.collector.sources import REGISTRY, Batch, PartialFetch
 from secondwind.adapters.warehouse.ingest_state import IngestState
+from secondwind.core.ports import DataWriter, IngestStore
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("collector")
@@ -33,7 +34,7 @@ def windows(start: date, end: date, size: int):
         start = stop + timedelta(days=1)
 
 
-def save(bq: BigQueryWriter, bucket, batch: Batch) -> None:
+def save(bq: DataWriter, bucket, batch: Batch) -> None:
     # Files first: an activity row only points at raw_file once the object exists.
     stored = set()
     for f in batch.files:
@@ -48,7 +49,7 @@ def save(bq: BigQueryWriter, bucket, batch: Batch) -> None:
     bq.upsert("health_daily", batch.health_daily)
 
 
-def run_source(name: str, env: dict, bq: BigQueryWriter, state: IngestState, bucket) -> bool:
+def run_source(name: str, env: dict, bq: DataWriter, state: IngestStore, bucket) -> bool:
     try:
         src = REGISTRY[name](env)
     except KeyError:

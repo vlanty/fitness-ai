@@ -3,18 +3,18 @@ does not care which data sources are enabled."""
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 
 from google.cloud import bigquery
 
-from secondwind.core.i18n import t
 
-STALE_AFTER = timedelta(hours=26)
 # Garmin keeps separate HR zones per sport; running ones go first.
 RUN_FIRST = "IFNULL(type, '') LIKE '%running%'"
 
 
 class BigQueryReader:
+    """`DataReader` on BigQuery."""
+
     def __init__(self, project_id: str, dataset_id: str, client: bigquery.Client | None = None) -> None:
         self.client = client or bigquery.Client(project=project_id)
         self.prefix = f"{project_id}.{dataset_id}"
@@ -154,20 +154,3 @@ class BigQueryReader:
     def get_source_status(self) -> list[dict]:
         return self._q(f"SELECT source, cursor_date, last_success_at, last_status, last_error "
                        f"FROM `{self.prefix}.ingest_state` ORDER BY source")
-
-
-def stale_warnings(status_rows: list[dict], enabled: list[str], lang: str = "en",
-                   now: datetime | None = None) -> list[str]:
-    """One line per enabled source that has not synced successfully for > STALE_AFTER."""
-    now = now or datetime.now(timezone.utc)
-    by_source = {r["source"]: r for r in status_rows}
-    out = []
-    for name in enabled:
-        r = by_source.get(name)
-        last = r.get("last_success_at") if r else None
-        if last is None:
-            out.append(t(lang, "stale.never", source=name))
-        elif now - last > STALE_AFTER:
-            status = f" ({r['last_status']})" if r.get("last_status") not in (None, "ok") else ""
-            out.append(t(lang, "stale.old", source=name, when=f"{last:%d.%m %H:%M}", status=status))
-    return out

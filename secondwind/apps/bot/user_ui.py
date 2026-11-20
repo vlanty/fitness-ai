@@ -14,7 +14,7 @@ from secondwind.core.athlete import (DISTANCES, PROFILE_FIELDS, InvalidInput, ac
                      Zones, compute_zones, parse_date, parse_distance, parse_duration, parse_profile_value)
 from secondwind.core.i18n import SUPPORTED, t
 from secondwind.core.models import DEFAULT_MODE, MODES
-from secondwind.adapters.state.firestore import StateStore
+from secondwind.core.ports import StateStore
 
 LANG_CHOICES = ("auto", *SUPPORTED)
 
