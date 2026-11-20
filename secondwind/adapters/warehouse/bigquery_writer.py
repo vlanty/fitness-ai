@@ -69,7 +69,7 @@ class BigQueryWriter:
             self.client.query(merge_sql(self.table(table_name), stage, cols, key)).result()
         finally:
             self.client.delete_table(stage, not_found_ok=True)
-        logger.info("BQ %s: upsert %d строк", table_name, len(rows))
+        logger.info("BQ %s: upserted %d rows", table_name, len(rows))
         return len(rows)
 
     def stored_file_ids(self, source: str, start: str) -> set[str]:

@@ -61,7 +61,7 @@ def run_source(name: str, env: dict, bq: DataWriter, state: IngestStore, bucket,
     try:
         src = REGISTRY[name](env)
     except KeyError:
-        logger.error("неизвестный источник %r (доступны: %s)", name, ", ".join(REGISTRY))
+        logger.error("unknown source %r (available: %s)", name, ", ".join(REGISTRY))
         return False
     except RuntimeError as e:
         logger.error("%s", e)
@@ -86,12 +86,12 @@ def run_source(name: str, env: dict, bq: DataWriter, state: IngestStore, bucket,
             batch = src.fetch(w_start, w_end, known)
         except PartialFetch as e:
             save(bq, bucket, e.batch, user_id)
-            logger.error("%s %s…%s: частично: %s", name, w_start, w_end, e)
+            logger.error("%s %s…%s: partial: %s", name, w_start, w_end, e)
             state.record(name, None, "partial", str(e)[:1000])
             ok = False
             break
         except Exception as e:  # noqa: BLE001 - report any provider failure and keep other sources running
-            logger.error("%s %s…%s: сбой: %s", name, w_start, w_end, e, exc_info=True)
+            logger.error("%s %s…%s: failed: %s", name, w_start, w_end, e, exc_info=True)
             state.record(name, None, "failed", str(e)[:1000])
             ok = False
             break
@@ -108,12 +108,12 @@ def main() -> int:
     env = dict(os.environ)
     names = [s.strip() for s in env.get("DATA_SOURCES", "").split(",") if s.strip()]
     if not names:
-        logger.error("DATA_SOURCES пуст — нечего собирать")
+        logger.error("DATA_SOURCES is empty: nothing to collect")
         return 2
 
     user_id = env.get("OWNER_USER_ID", "").strip()
     if not user_id:
-        logger.error("OWNER_USER_ID пуст — не знаю, чьи это данные")
+        logger.error("OWNER_USER_ID is empty: unknown whose data this is")
         return 2
 
     bq = BigQueryWriter(env["GCP_PROJECT"], env["BQ_DATASET"], user_id)
@@ -124,7 +124,7 @@ def main() -> int:
         bucket = storage.Client(project=env["GCP_PROJECT"]).bucket(env["RAW_BUCKET"])
 
     results = {n: run_source(n, env, bq, state, bucket, user_id) for n in names}
-    logger.info("итог: %s", ", ".join(f"{n}={'ok' if r else 'СБОЙ'}" for n, r in results.items()))
+    logger.info("result: %s", ", ".join(f"{n}={'ok' if r else 'FAILED'}" for n, r in results.items()))
     return 0 if all(results.values()) else 1
 
 

@@ -8,13 +8,13 @@ variable "gcp_region" {
 }
 
 variable "data_sources" {
-  description = "Где брать данные. Порядок = приоритет при склейке дублей (первый главный)."
+  description = "Where data comes from. Order = priority when merging duplicates (first wins)."
   type        = list(string)
   default     = ["garmin"]
 
   validation {
     condition     = length(var.data_sources) > 0 && alltrue([for s in var.data_sources : contains(["garmin"], s)])
-    error_message = "data_sources: непустой список из \"garmin\"."
+    error_message = "data_sources: a non-empty list of \"garmin\"."
   }
 }
 
@@ -40,13 +40,13 @@ variable "tenancy" {
 }
 
 variable "retired_secrets" {
-  description = "Секреты, которые больше не используются: остаются в Secret Manager с меткой status=retired, не удаляются."
+  description = "Secrets no longer in use: kept in Secret Manager with label status=retired, never deleted."
   type        = list(string)
   default     = []
 }
 
 variable "sync_schedule" {
-  description = "Cron (UTC) запуска сборщика."
+  description = "Collector schedule (cron, UTC)."
   type        = string
   default     = "15 */4 * * *"
 }

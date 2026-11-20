@@ -1,6 +1,6 @@
 output "bot_url" {
   value       = module.cloud_run.bot_url
-  description = "URL Telegram бота для настройки webhook"
+  description = "Bot URL, used to set the Telegram webhook"
 }
 
 output "collector_job_name" {
@@ -16,6 +16,6 @@ output "raw_bucket" {
 }
 
 output "secrets_to_fill" {
-  description = "Секреты, которым нужно значение (scripts/setup.py secrets)."
+  description = "Secrets that need a value (scripts/setup.py secrets)."
   value       = concat(local.core_secrets, local.collector_secrets)
 }

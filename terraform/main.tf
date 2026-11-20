@@ -32,7 +32,7 @@ locals {
   collector_secrets = distinct(flatten([for s in var.data_sources : local.source_secrets[s]]))
 }
 
-# Включаем нужные GCP APIs
+# GCP APIs the project needs
 resource "google_project_service" "apis" {
   for_each = toset([
     "run.googleapis.com",
@@ -47,7 +47,7 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
-# Service account для Cloud Run
+# Service account for Cloud Run
 resource "google_service_account" "runner" {
   account_id   = "fitness-runner"
   display_name = "Fitness AI Runner"
@@ -94,7 +94,7 @@ resource "google_project_iam_member" "runner_run_invoker" {
   member  = "serviceAccount:${google_service_account.runner.email}"
 }
 
-# Artifact Registry для Docker образов
+# Artifact Registry for the Docker images
 resource "google_artifact_registry_repository" "repo" {
   location      = var.gcp_region
   repository_id = "fitness-ai"

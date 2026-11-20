@@ -37,19 +37,19 @@ PAUSE_SECONDS = 1.0  # be polite: one request per second
 
 # Metric -> substrings of JSON field names that indicate it is present.
 HEALTH_METRICS = {
-    "Сон: длительность":        ["sleeptimeseconds"],
-    "Сон: фазы (deep/REM)":     ["deepsleepseconds", "remsleepseconds"],
-    "Сон: score":               ["sleepscores"],
+    "Sleep: duration":          ["sleeptimeseconds"],
+    "Sleep: stages (deep/REM)": ["deepsleepseconds", "remsleepseconds"],
+    "Sleep: score":             ["sleepscores"],
     "HRV":                      ["lastnightavg", "weeklyavg"],
     "Stress":                   ["averagestresslevel", "overallstresslevel"],
     "Body Battery":             ["bodybattery", "charged"],
-    "Пульс покоя":              ["restingheartrate"],
+    "Resting HR":               ["restingheartrate"],
     "SpO2":                     ["spo2"],
-    "Дыхание":                  ["respiration"],
-    "Шаги":                     ["totalsteps"],
+    "Respiration":              ["respiration"],
+    "Steps":                    ["totalsteps"],
     "VO2 max (health API)":     ["vo2max"],
     "Training readiness":       ["trainingreadiness", "readiness"],
-    "Training status / нагрузка": ["trainingstatus", "acuteload", "trainingload"],
+    "Training status / load": ["trainingstatus", "acuteload", "trainingload"],
 }
 
 
@@ -76,7 +76,7 @@ class Probe:
                         headers={"Accept": "*/*", "Authorization": "ApiKey " + api_key}, timeout=30)
         self._note("POST", TOKEN_PATH, r, t0)
         if not r.ok:
-            sys.exit(f"Не удалось получить токен: HTTP {r.status_code}. Проверьте ключ и срок его действия.")
+            sys.exit(f"Could not get a token: HTTP {r.status_code}. Check the key and its expiry.")
         return r.text.strip()  # JWT, valid 24h; never printed
 
     def get(self, path: str, params: dict | None = None, accept: str = "application/json"):
@@ -86,7 +86,7 @@ class Probe:
                        headers={"Accept": accept, "Authorization": "Bearer " + self.token})
         self._note("GET", path, r, t0)
         if r.status_code == 429:
-            print(f"  ! 429 Too Many Requests на {path}; Retry-After={r.headers.get('Retry-After')}")
+            print(f"  ! 429 Too Many Requests on {path}; Retry-After={r.headers.get('Retry-After')}")
         return r
 
     def get_json(self, name: str, path: str, params: dict | None = None):
@@ -124,7 +124,7 @@ def list_activities(p: Probe, label: str, start: date, end: date) -> list:
                               {"start": 0, "limit": 100,
                                "startDate": start.isoformat(), "endDate": end.isoformat()})
     acts = body if isinstance(body, list) else []
-    print(f"  {label:<14} {start} … {end}: HTTP {status}, активностей: {len(acts)}")
+    print(f"  {label:<14} {start} … {end}: HTTP {status}, activities: {len(acts)}")
     return acts
 
 
@@ -139,7 +139,7 @@ def inspect_fit(p: Probe, activity_id) -> dict:
             names = z.namelist()
             fit_name = next((n for n in names if n.lower().endswith(".fit")), None)
             if not fit_name:
-                return {"error": "в ZIP нет .fit", "zip_files": names}
+                return {"error": "no .fit inside the ZIP", "zip_files": names}
             fit_bytes = z.read(fit_name)
     except zipfile.BadZipFile:
         fit_bytes, names, fit_name = r.content, [], "(raw)"
@@ -147,7 +147,7 @@ def inspect_fit(p: Probe, activity_id) -> dict:
     try:
         from garmin_fit_sdk import Decoder, Stream
     except ImportError:
-        return {"error": "не установлен garmin-fit-sdk (pip install garmin-fit-sdk)"}
+        return {"error": "garmin-fit-sdk is not installed (pip install garmin-fit-sdk)"}
 
     decoder = Decoder(Stream.from_byte_array(bytearray(fit_bytes)))
     # Unknown (undocumented) messages are kept by the SDK under their number, e.g. "140".
@@ -172,7 +172,7 @@ def inspect_fit(p: Probe, activity_id) -> dict:
         "Aerobic training effect": session.get("total_training_effect"),
         "Anaerobic training effect": session.get("total_anaerobic_training_effect"),
         # Recovery time / performance condition live in undocumented message 140.
-        "Сообщение 140 (recovery/perf. condition, недокументировано)": bool(unknown_140),
+        "Message 140 (recovery/perf. condition, undocumented)": bool(unknown_140),
         "msg140_fields": sorted(str(k) for k in (unknown_140[0].keys() if unknown_140 else [])),
     }
 
@@ -180,13 +180,13 @@ def inspect_fit(p: Probe, activity_id) -> dict:
 # ---- main ------------------------------------------------------------------
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--date", help="день для health-сводки (по умолчанию вчера)")
+    ap.add_argument("--date", help="day for the health summary (default: yesterday)")
     ap.add_argument("--out", default="garmin_probe_out")
     args = ap.parse_args()
 
     api_key = os.environ.get("GARMIN_PERSONAL_API_KEY", "").strip()
     if not api_key:
-        sys.exit("Задайте переменную окружения GARMIN_PERSONAL_API_KEY.")
+        sys.exit("Set the GARMIN_PERSONAL_API_KEY environment variable.")
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     os.chmod(out, 0o700)  # personal health data
@@ -195,10 +195,10 @@ def main() -> None:
     day = date.fromisoformat(args.date) if args.date else today - timedelta(days=1)
     p = Probe(api_key, out)
     del api_key
-    print("Токен получен.\n")
+    print("Token received.\n")
 
     # 1. Activities and history depth
-    print("1) Активности и глубина истории")
+    print("1) Activities and history depth")
     windows = {"7d": (today - timedelta(days=7), today)}
     for months in (13, 25, 37, 61):
         end = today - timedelta(days=30 * months)
@@ -207,9 +207,9 @@ def main() -> None:
     oldest_ok = [lbl for lbl, acts in found.items() if acts]
 
     # 2. One .FIT file
-    print("\n2) Файл активности (.FIT)")
+    print("\n2) Activity file (.FIT)")
     sample = (found["7d"] or next((a for a in found.values() if a), []))
-    fit_info = {"error": "нет активностей для проверки"}
+    fit_info = {"error": "no activities to check"}
     if sample:
         aid = sample[0].get("activityId")
         print(f"  activityId {aid} ({sample[0].get('activityType', {}).get('typeKey')})")
@@ -218,10 +218,10 @@ def main() -> None:
         for k, v in fit_info.items():
             if k not in ("message_types", "msg140_fields", "zip_files"):
                 print(f"  {k}: {v}")
-        print(f"  типы сообщений: {', '.join(fit_info.get('message_types', []))}")
+        print(f"  message types: {', '.join(fit_info.get('message_types', []))}")
 
     # 3. Health for one day
-    print(f"\n3) Health за {day}")
+    print(f"\n3) Health for {day}")
     d = day.isoformat()
     endpoints = {
         "sleep":           ("/sleep-service/sleep/dailySleep", {"date": d}),
@@ -241,7 +241,7 @@ def main() -> None:
         status, body = p.get_json(f"health_{name}", path, params)
         keys = flat_keys(body)
         health_keys[name] = keys
-        print(f"  {name:<26} HTTP {status:<4} полей: {len(keys)}")
+        print(f"  {name:<26} HTTP {status:<4} fields: {len(keys)}")
 
     # Health history depth: same daily summary 13 months back.
     old = (today - timedelta(days=395)).isoformat()
@@ -254,29 +254,29 @@ def main() -> None:
     rows = []
     for metric, needles in HEALTH_METRICS.items():
         hits = sorted({src for k, src in all_keys.items() if any(n in k.rsplit(".", 1)[-1].replace("_", "") for n in needles)})
-        rows.append((metric, "есть" if hits else "нет", ", ".join(hits)))
+        rows.append((metric, "yes" if hits else "no", ", ".join(hits)))
     for metric in ("VO2 max (max_met_data)", "Aerobic training effect", "Anaerobic training effect",
-                   "Сообщение 140 (recovery/perf. condition, недокументировано)"):
+                   "Message 140 (recovery/perf. condition, undocumented)"):
         v = fit_info.get(metric)
         present = v is not None and v is not False  # 0.0 is a real value (e.g. strength training TE)
-        rows.append((f".FIT: {metric}", "есть" if present else "нет", "" if v is None or isinstance(v, bool) else str(v)))
+        rows.append((f".FIT: {metric}", "yes" if present else "no", "" if v is None or isinstance(v, bool) else str(v)))
 
-    print("\n================ ИТОГ ================")
+    print("\n================ SUMMARY ================")
     w = max(len(r[0]) for r in rows)
     for m, yn, src in rows:
         print(f"{m:<{w}}  {yn:<4}  {src}")
-    print(f"\nИстория активностей: есть данные в окнах {oldest_ok or 'нет'}")
-    print(f"История health 13 мес. назад ({old}): {'есть' if health_history else 'нет'}")
+    print(f"\nActivity history: data in windows {oldest_ok or 'none'}")
+    print(f"Health history 13 months back ({old}): {'yes' if health_history else 'no'}")
     codes: dict[int, int] = {}
     for c in p.calls:
         codes[c["status"]] = codes.get(c["status"], 0) + 1
-    print(f"Запросов: {len(p.calls)}, коды ответов: {codes}")
-    print(f"Заголовки лимитов: {p.rate_headers or 'не прислано'}")
+    print(f"Requests: {len(p.calls)}, response codes: {codes}")
+    print(f"Rate-limit headers: {p.rate_headers or 'none sent'}")
     (out / "report.json").write_text(json.dumps({
         "rows": rows, "activity_windows_with_data": oldest_ok, "health_history_13mo": health_history,
         "calls": p.calls, "rate_headers": p.rate_headers, "fit": fit_info,
     }, ensure_ascii=False, indent=2, default=str))
-    print(f"Сырые ответы и report.json: {out.resolve()}")
+    print(f"Raw responses and report.json: {out.resolve()}")
 
 
 if __name__ == "__main__":
