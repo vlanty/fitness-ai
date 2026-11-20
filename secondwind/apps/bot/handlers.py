@@ -12,6 +12,7 @@ from secondwind.adapters.llm.claude import ClaudeLLM
 from secondwind.adapters.warehouse.bigquery_reader import BigQueryReader
 from secondwind.core.assistant import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, NUTRITION_PROMPT, Refused, analyze
 from secondwind.core.freshness import stale_warnings
+from secondwind.core.router import Route, route as route_message
 from secondwind.core.ports import LLM, DataReader, StateStore
 from secondwind.core import analytics
 from secondwind.apps.bot import charts, tenancy
@@ -23,6 +24,7 @@ from secondwind.adapters.state.firestore import FirestoreStore
 from secondwind.apps.bot.user_ui import (apply_setting, ask_text, distance_keyboard, handle_input, render_goal, render_profile,
                      render_settings)
 from secondwind.apps.bot.tg_format import html_to_plain, md_to_html, split_message
+from secondwind.apps.bot.user_ui import _zones_title
 
 logger = logging.getLogger(__name__)
 
@@ -619,7 +621,96 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         await _show(update, text, kb)
         return
+    r = route_message(update.message.text, _lang(update, user), date.today())
+    if r.kind != "model":
+        try:
+            answer = _fast_answer(update, r, user)
+        except Exception as e:  # noqa: BLE001 - any failure falls back to the model
+            logger.error("fast answer %s failed: %s", r.key, e)
+            answer = None
+        logger.info("route kind=%s key=%s answered_without_ai=%s", r.kind, r.key, answer is not None)
+        if answer is not None:
+            text, kw = answer
+            await _reply(update, text, **kw)
+            return
+    else:
+        logger.info("route kind=model")
     await _ai_reply(update, ASK_PROMPT, "ask", "chat", question=update.message.text[:1000])
+
+
+# ---------- answers without the AI model (filter and rule router) ----------
+
+def _d(v) -> str:
+    return v.strftime("%d.%m") if hasattr(v, "strftime") else str(v)
+
+
+def _clock(seconds: float) -> str:
+    s = int(round(seconds))
+    h, rest = divmod(s, 3600)
+    m, sec = divmod(rest, 60)
+    return f"{h}:{m:02d}:{sec:02d}" if h else f"{m}:{sec:02d}"
+
+
+def _fast_metric(update: Update, lang: str, metric: str, day: date) -> str:
+    if metric == "vo2max":
+        load = _bq(update).get_load_last_days(1)
+        v = load[-1].get("vo2max") if load else None
+        return t(lang, "fast.metric.vo2max", v=f"{v:.1f}", date=_d(load[-1]["date"])) if v else t(lang, "fast.no_data")
+    rows = _bq(update).get_health_last_days(4)
+    row = next((h for h in rows if str(h.get("date")) == day.isoformat()), None) or {}
+    when = _d(day)
+    if metric == "resting_hr" and row.get("resting_hr"):
+        return t(lang, "fast.metric.resting_hr", date=when, v=row["resting_hr"])
+    if metric == "hrv" and row.get("hrv_last_night"):
+        extra = (t(lang, "fast.metric.hrv_extra", lo=row["hrv_baseline_low"], hi=row["hrv_baseline_high"],
+                   status=row.get("hrv_status") or "—") if row.get("hrv_baseline_low") else "")
+        return t(lang, "fast.metric.hrv", date=when, v=row["hrv_last_night"], extra=extra)
+    if metric == "sleep" and row.get("sleep_seconds"):
+        extra = t(lang, "fast.metric.sleep_extra", deep=_hm(row.get("deep_sleep_seconds"), lang),
+                  rem=_hm(row.get("rem_sleep_seconds"), lang), score=row.get("sleep_score") or "—")
+        return t(lang, "fast.metric.sleep", date=when, v=_hm(row["sleep_seconds"], lang), extra=extra)
+    if metric == "steps" and row.get("steps") is not None:
+        return t(lang, "fast.metric.steps", date=when, v=row["steps"])
+    if metric == "body_battery" and row.get("body_battery_high") is not None:
+        return t(lang, "fast.metric.body_battery", date=when, lo=row.get("body_battery_low") or "—",
+                 hi=row["body_battery_high"])
+    if metric == "stress" and row.get("stress_avg") is not None:
+        return t(lang, "fast.metric.stress", date=when, v=row["stress_avg"])
+    return t(lang, "fast.metric.missing", date=when)
+
+
+def _fast_answer(update: Update, r: Route, user: dict) -> tuple[str, dict] | None:
+    """Text and reply options for messages answered without the model; None = ask the model."""
+    lang, p, html = r.lang, r.params, {"parse_mode": "HTML"}
+    if r.kind == "filter":
+        return t(lang, r.key), {}
+    if r.key == "fact.last_workout":
+        a = _bq(update).get_last_activity()
+        return (_fmt_activity(a, lang), {"parse_mode": "Markdown"}) if a else (t(lang, "fast.no_data"), {})
+    if r.key == "fact.records":
+        return analytics.render_records(lang, _bq(update).get_records(date.today() - timedelta(days=365))), html
+    if r.key == "fact.run_distance":
+        per = _bq(update).get_period(p["start"], p["end"])
+        fields = dict(period=t(lang, f"fast.period.{p['period']}"), start=_d(p["start"]), end=_d(p["end"]))
+        if not per.get("runs"):
+            return t(lang, "fast.run_none", **fields), html
+        return t(lang, "fast.run_distance", km=f"{per['run_km']:.1f}", runs=per["runs"], **fields), html
+    if r.key == "fact.metric":
+        return _fast_metric(update, lang, p["metric"], p["date"]), html
+    if r.key == "calc.zones":
+        inputs = _athlete_inputs(update)
+        z = compute_zones(user.get("profile") or {}, inputs, inputs.get("resting_hr_7d"))
+        if not z:
+            return t(lang, "prof.zones.need"), html
+        lines = [_zones_title(lang, z)] + [f"Z{i + 1}: {a}–{b}" for i, (a, b) in enumerate(z.zones)]
+        return "\n".join(lines), html
+    if r.key == "calc.pace":
+        km = p["distance_km"]
+        km_s = f"{km:g}"
+        if "total_s" in p:
+            return t(lang, "fast.pace.result", km=km_s, time=_clock(p["total_s"]), pace=_clock(p["total_s"] / km)), html
+        return t(lang, "fast.time.result", km=km_s, pace=_clock(p["pace_s"]), time=_clock(p["pace_s"] * km)), html
+    return None
 
 
 def _clears_pending(handler):

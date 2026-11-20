@@ -1,0 +1,26 @@
+# Questions answered from the data or by a calculator, without the AI model.
+# A message that matches `to_model` (why, how to improve, is it normal, ...) always goes to the
+# model, even if an intent below matches. Parameters (period, metric, numbers) are extracted in
+# code (secondwind/core/router.py). Order matters: the first matching intent wins.
+to_model:
+  ru: ['почему|зачем|из-за чего|как (улучшить|поднять|снизить|исправить|восстановиться)|что (делать|посоветуешь)|нормальн\w*|стоит ли|можно ли|надо ли|нужно ли|план|совет|оцени|проанализируй|сравни']
+  en: ["why|how (do|can|should) i (improve|raise|lower|fix|recover)|what should|normal|is it ok|should i|can i|plan|advice|analy[sz]e|compare|evaluate"]
+intents:
+  - intent: calc.pace
+    ru: ['\d+([.,]\d+)?\s*(км|k)\b.{0,12}\bза\s*\d', 'темп\w*\s*\d+[:.]\d\d', '\d+[:.]\d\d\s*(на|/)\s*км']
+    en: ['\d+(\.\d+)?\s*(km|k)\b.{0,12}\bin\s*\d', 'pace (of )?\d+[:.]\d\d', '\d+[:.]\d\d\s*(per|/)\s*km']
+  - intent: calc.zones
+    ru: ['(мои|какие|покажи)\W+(\w+\W+){0,2}зон', 'пульсов\w* зон', '^\W*зоны( пульса)?\W*$']
+    en: ['(my|what are my|show)\W+(\w+\W+){0,2}zones', 'heart ?rate zones', '^\W*zones\W*$']
+  - intent: fact.records
+    ru: ['(мои |какие |покажи )?рекорд\w*', 'лучш\w+ (время|результат)\w* на']
+    en: ['(personal )?(records?|bests?|\bprs?\b)']
+  - intent: fact.last_workout
+    ru: ['последн\w+ (тренировк|пробежк|занят|активност)\w*']
+    en: ['(last|latest|previous) (workout|run|activity|session|training)']
+  - intent: fact.run_distance
+    ru: ['сколько\W+(\w+\W+){0,3}(пробежал|набегал|км)', 'какой (у меня )?(объ[её]м|километраж)']
+    en: ['how (far|many (km|kilometers|kilometres)|much) (\w+\W+){0,2}(run|ran)', '(running )?(mileage|volume|distance) (this|last)']
+  - intent: fact.metric
+    ru: ['(какой|какая|какое|какие|сколько|покажи|скажи)\W+(\w+\W+){0,4}(пульс\w* (в )?поко|чсс поко|hrv|вариабельн|сон|спал|шаг|body battery|батаре|стресс|vo2|мпк)']
+    en: ['(what|how much|how many|how long|show|tell)\W+(\w+\W+){0,4}(resting (heart rate|hr)|\brhr\b|hrv|sleep|slept|steps|body battery|stress|vo2)']
