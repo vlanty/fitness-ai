@@ -7,7 +7,7 @@ A source turns a date range into normalized rows:
 
 To add a source: create collector/sources/<name>.py with a class that
 subclasses Source, register it in sources/__init__.py, list its secrets in
-terraform (var.source_secrets) and document it in docs/setup.md (see docs/how-it-works.md).
+terraform (local.source_secrets) and document it in docs/setup.md (see docs/how-it-works.md).
 """
 
 from __future__ import annotations

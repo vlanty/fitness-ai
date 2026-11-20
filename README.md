@@ -33,7 +33,8 @@ injuries with `/profile`. Heart-rate zones come straight from your watch.
 and your full history is loaded on first install.
 
 ⚙️ **You stay in control.** Pick the AI mode and see what it costs this month in `/settings`.
-Only your chat gets answers, and your data never leaves your own cloud project.
+Only your chat gets answers. Your data is stored only in your own cloud project; for AI answers,
+a summary of it is sent to the AI model.
 
 ## Documentation
 
@@ -43,3 +44,22 @@ Only your chat gets answers, and your data never leaves your own cloud project.
 | 🛠 [Operations](docs/operations.md) | updating, rotating keys and tokens, troubleshooting |
 | 🔬 [How it works](docs/how-it-works.md) | architecture, merging sources, how load, readiness, status and zones are calculated |
 | 🤖 [Commands](docs/commands.md) | every bot command and what it shows |
+
+## Support
+
+Second Wind is free for non-commercial use. If Vita helps your training, you can support the project:
+
+- 💜 [GitHub Sponsors](https://github.com/sponsors/vlanty)
+- ☕ [Ko-fi](https://ko-fi.com/vlant)
+
+## License
+
+Second Wind is **source-available** under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
+
+- ✅ Free to install and run for yourself, your friends, your club or a non-profit, for any number
+  of users, as long as nobody pays for it.
+- ❌ Charging users (subscriptions, paid access, ads or any other commercial use) needs a separate
+  commercial license. To ask for one, [open an issue](https://github.com/vlanty/second-wind/issues).
+
+This is a plain-language summary; the [license text](LICENSE.md) is what applies. Garmin, Strava
+and AI-provider terms apply on top of it.

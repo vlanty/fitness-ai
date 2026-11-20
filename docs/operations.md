@@ -6,23 +6,27 @@
 - [Rotating keys and tokens](#rotating-keys-and-tokens)
 - [Troubleshooting](#troubleshooting)
 
-The commands below assume `BASE` is set as in [Setup](setup.md#install), step 4.
+The commands below assume `REGION` and `BASE` are set as in [Setup](setup.md#install), step 4.
 
 ## Updating
 
 ```bash
 docker build --platform linux/amd64 -t ${BASE}/collector:latest ./collector && docker push ${BASE}/collector:latest
 docker build --platform linux/amd64 -t ${BASE}/bot:latest ./bot && docker push ${BASE}/bot:latest
-gcloud run services update fitness-bot --region europe-west3 --image ${BASE}/bot:latest
+gcloud run jobs update fitness-collector --region ${REGION} --image ${BASE}/collector:latest
+gcloud run services update fitness-bot --region ${REGION} --image ${BASE}/bot:latest
 ```
+
+Both commands are needed: Cloud Run pins the image when the job or service is updated, so a
+new push of `:latest` alone does not reach them.
 
 The bot URL (and so the Telegram webhook) does not change between revisions.
 
 **Roll back the bot:**
 
 ```bash
-gcloud run revisions list --service fitness-bot --region europe-west3
-gcloud run services update-traffic fitness-bot --region europe-west3 --to-revisions PREVIOUS_REVISION=100
+gcloud run revisions list --service fitness-bot --region ${REGION}
+gcloud run services update-traffic fitness-bot --region ${REGION} --to-revisions PREVIOUS_REVISION=100
 ```
 
 **Heart-rate zones for old activities.** Activities stored before the collector learned to read
@@ -56,7 +60,7 @@ Copy the whole new token, digits before the colon included.
 1. @BotFather → `/revoke` → choose the bot → new token.
 2. `python3 scripts/setup.py secrets --update telegram_bot_token`, then disable the old version:
    `gcloud secrets versions disable OLD_VERSION --secret telegram_bot_token`.
-3. `gcloud run services update fitness-bot --region europe-west3 --revision-suffix token-$(date +%s)`:
+3. `gcloud run services update fitness-bot --region ${REGION} --revision-suffix token-$(date +%s)`:
    new instances read the new token.
 4. `python3 scripts/setup.py webhook`: revoking the token removed the webhook.
 
@@ -68,9 +72,9 @@ a digit lost when pasting): store it again and repeat step 3.
 `/status` in the bot shows the last successful sync per source. For more:
 
 ```bash
-gcloud run jobs executions list --job fitness-collector --region europe-west3 --limit 5
+gcloud run jobs executions list --job fitness-collector --region ${REGION} --limit 5
 gcloud logging read 'resource.labels.job_name="fitness-collector" AND severity>=WARNING' --freshness=1d --limit 20
-gcloud run services logs read fitness-bot --region europe-west3 --limit=50
+gcloud run services logs read fitness-bot --region ${REGION} --limit=50
 ```
 
 **Garmin 401/403 on token.** The key expired or was deleted: see [Garmin key](#garmin-key).
@@ -83,9 +87,9 @@ Telegram drops the webhook when a token is revoked.
 If that id is yours, store it and roll out a fresh revision (secrets are read at instance start):
 
 ```bash
-gcloud run services logs read fitness-bot --region europe-west3 --limit=50 | grep "rejected chat"
+gcloud run services logs read fitness-bot --region ${REGION} --limit=50 | grep "rejected chat"
 python3 scripts/setup.py secrets --update telegram_chat_id
-gcloud run services update fitness-bot --region europe-west3 --revision-suffix chatid-$(date +%s)
+gcloud run services update fitness-bot --region ${REGION} --revision-suffix chatid-$(date +%s)
 ```
 
 **Secrets in logs.** The bot never writes the Telegram token or the Anthropic key to the logs:
