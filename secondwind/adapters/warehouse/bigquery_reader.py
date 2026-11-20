@@ -1,5 +1,8 @@
 """Read-only queries for the bot. Only the unified views are used, so the bot
-does not care which data sources are enabled."""
+does not care which data sources are enabled.
+
+Every query reads one user's rows: `user_id = @uid` is in every WHERE / JOIN, and the
+reader is created for one user (tests check each query)."""
 
 from __future__ import annotations
 
@@ -15,11 +18,18 @@ RUN_FIRST = "IFNULL(type, '') LIKE '%running%'"
 class BigQueryReader:
     """`DataReader` on BigQuery."""
 
-    def __init__(self, project_id: str, dataset_id: str, client: bigquery.Client | None = None) -> None:
+    def __init__(self, project_id: str, dataset_id: str, user_id: str,
+                 client: bigquery.Client | None = None) -> None:
+        if not user_id:
+            raise ValueError("user_id is required")
         self.client = client or bigquery.Client(project=project_id)
         self.prefix = f"{project_id}.{dataset_id}"
+        self.user_id = user_id
 
     def _q(self, sql: str, **params) -> list[dict]:
+        if "@uid" not in sql:
+            raise ValueError("every bot query must filter by user_id = @uid")
+        params["uid"] = self.user_id
         types = {date: "DATE", int: "INT64", str: "STRING"}
         cfg = bigquery.QueryJobConfig(query_parameters=[
             bigquery.ScalarQueryParameter(k, types[type(v)], v) for k, v in params.items()])
@@ -27,24 +37,24 @@ class BigQueryReader:
 
     def get_last_activity(self) -> dict | None:
         rows = self._q(f"SELECT * FROM `{self.prefix}.activities_unified` "
-                       "ORDER BY activity_date DESC, start_time DESC LIMIT 1")
+                       "WHERE user_id = @uid ORDER BY activity_date DESC, start_time DESC LIMIT 1")
         return rows[0] if rows else None
 
     def get_week_activities(self, weeks_back: int = 0) -> list[dict]:
         today = date.today()
         monday = today - timedelta(days=today.weekday() + weeks_back * 7)
         return self._q(f"SELECT * FROM `{self.prefix}.activities_unified` "
-                       "WHERE activity_date BETWEEN @mon AND @sun ORDER BY activity_date, start_time",
+                       "WHERE user_id = @uid AND activity_date BETWEEN @mon AND @sun ORDER BY activity_date, start_time",
                        mon=monday, sun=monday + timedelta(days=6))
 
     def get_health_last_days(self, days: int = 14) -> list[dict]:
         return self._q(f"SELECT * FROM `{self.prefix}.health_daily_unified` "
-                       "WHERE date >= @since ORDER BY date",
+                       "WHERE user_id = @uid AND date >= @since ORDER BY date",
                        since=date.today() - timedelta(days=days))
 
     def get_load_last_days(self, days: int = 1) -> list[dict]:
         return self._q(f"SELECT * FROM `{self.prefix}.training_load_daily` "
-                       "WHERE date > @since ORDER BY date",
+                       "WHERE user_id = @uid AND date > @since ORDER BY date",
                        since=date.today() - timedelta(days=days))
 
     # ---------- analytics (stage 3) ----------
@@ -60,7 +70,7 @@ class BigQueryReader:
             WITH s AS (
               SELECT d, activity_date, name, SAFE_CAST(CASE d {cases} END AS FLOAT64) AS secs
               FROM `{self.prefix}.activities`, UNNEST([{dists}]) AS d
-              WHERE source = 'garmin' AND IFNULL(type, '') LIKE '%running%'),
+              WHERE user_id = @uid AND source = 'garmin' AND IFNULL(type, '') LIKE '%running%'),
             ok AS (SELECT * FROM s WHERE secs > 0 AND secs / d * 1000 >= 150),
             best AS (
               SELECT d, 'all' AS span, activity_date, name, secs,
@@ -76,11 +86,11 @@ class BigQueryReader:
             WITH a AS (
               SELECT *, IFNULL(type, '') LIKE '%running%' AS is_run
               FROM `{self.prefix}.activities_unified`
-              WHERE activity_date BETWEEN @start AND @end),
+              WHERE user_id = @uid AND activity_date BETWEEN @start AND @end),
             z AS (
               SELECT {", ".join(f"SUM(SAFE_CAST(JSON_VALUE(raw_json, '$.hrTimeInZone_{i}') AS FLOAT64)) AS z{i}" for i in range(1, 6))}
               FROM `{self.prefix}.activities`
-              WHERE source = 'garmin' AND activity_date BETWEEN @start AND @end)
+              WHERE user_id = @uid AND source = 'garmin' AND activity_date BETWEEN @start AND @end)
             SELECT
               COUNT(*) AS n, COUNTIF(is_run) AS runs,
               SUM(IFNULL(duration_seconds, 0)) AS secs,
@@ -106,16 +116,16 @@ class BigQueryReader:
             SELECT w AS week, IFNULL(SUM(distance_meters) / 1000, 0) AS km
             FROM UNNEST(GENERATE_DATE_ARRAY(DATE_SUB(@monday, INTERVAL {weeks - 1} WEEK), @monday, INTERVAL 1 WEEK)) AS w
             LEFT JOIN `{self.prefix}.activities_unified` a
-              ON DATE_TRUNC(a.activity_date, WEEK(MONDAY)) = w AND IFNULL(a.type, '') LIKE '%running%'
+              ON a.user_id = @uid AND DATE_TRUNC(a.activity_date, WEEK(MONDAY)) = w AND IFNULL(a.type, '') LIKE '%running%'
             GROUP BY w ORDER BY w""", monday=monday)
 
     def get_load_series(self, days: int = 120) -> list[dict]:
         return self._q(f"SELECT date, acute_load, chronic_load FROM `{self.prefix}.training_load_daily` "
-                       "WHERE date > @since ORDER BY date", since=date.today() - timedelta(days=days))
+                       "WHERE user_id = @uid AND date > @since ORDER BY date", since=date.today() - timedelta(days=days))
 
     def get_health_series(self, days: int = 90) -> list[dict]:
         return self._q(f"SELECT date, hrv_last_night, hrv_baseline_low, hrv_baseline_high, resting_hr "
-                       f"FROM `{self.prefix}.health_daily_unified` WHERE date > @since ORDER BY date",
+                       f"FROM `{self.prefix}.health_daily_unified` WHERE user_id = @uid AND date > @since ORDER BY date",
                        since=date.today() - timedelta(days=days))
 
     def get_run_efficiency(self, days: int = 180) -> list[dict]:
@@ -124,7 +134,7 @@ class BigQueryReader:
             SELECT activity_date AS date,
                    (distance_meters / duration_seconds * 60) / avg_heart_rate AS m_per_beat
             FROM `{self.prefix}.activities_unified`
-            WHERE IFNULL(type, '') LIKE '%running%' AND activity_date > @since
+            WHERE user_id = @uid AND IFNULL(type, '') LIKE '%running%' AND activity_date > @since
               AND distance_meters >= 3000 AND duration_seconds > 0 AND avg_heart_rate >= 90
             ORDER BY activity_date""", since=date.today() - timedelta(days=days))
 
@@ -137,20 +147,20 @@ class BigQueryReader:
             WITH z AS (
               SELECT activity_date AS zones_date, type AS zones_type, hr_zone_calc, hr_zone_bounds, lthr
               FROM `{self.prefix}.activities`
-              WHERE hr_zone_bounds IS NOT NULL
+              WHERE user_id = @uid AND hr_zone_bounds IS NOT NULL
               ORDER BY {RUN_FIRST} DESC, start_time DESC LIMIT 1),
             old AS (
               SELECT lthr AS lthr_then, activity_date AS lthr_then_date
               FROM `{self.prefix}.activities`
-              WHERE lthr IS NOT NULL AND activity_date <= DATE_SUB(@today, INTERVAL 30 DAY)
+              WHERE user_id = @uid AND lthr IS NOT NULL AND activity_date <= DATE_SUB(@today, INTERVAL 30 DAY)
               ORDER BY {RUN_FIRST} DESC, ABS(DATE_DIFF(activity_date, DATE_SUB(@today, INTERVAL 90 DAY), DAY)) LIMIT 1),
             r AS (
               SELECT CAST(ROUND(AVG(resting_hr)) AS INT64) AS resting_hr_7d
               FROM `{self.prefix}.health_daily_unified`
-              WHERE date > DATE_SUB(@today, INTERVAL 7 DAY) AND resting_hr IS NOT NULL)
+              WHERE user_id = @uid AND date > DATE_SUB(@today, INTERVAL 7 DAY) AND resting_hr IS NOT NULL)
             SELECT * FROM r LEFT JOIN z ON TRUE LEFT JOIN old ON TRUE""", today=date.today())
         return rows[0] if rows else {}
 
     def get_source_status(self) -> list[dict]:
         return self._q(f"SELECT source, cursor_date, last_success_at, last_status, last_error "
-                       f"FROM `{self.prefix}.ingest_state` ORDER BY source")
+                       f"FROM `{self.prefix}.ingest_state` WHERE user_id = @uid ORDER BY source")

@@ -37,8 +37,9 @@ MENU_BUTTONS = [["today", "week"], ["month", "compare"], ["records", "charts"], 
                 ["nutrition", "goal"], ["profile", "settings"], ["status"]]
 
 
-def _bq() -> DataReader:
-    return BigQueryReader(os.environ["GCP_PROJECT"], os.environ["BQ_DATASET"])
+def _bq(update: Update) -> DataReader:
+    """This chat's user's data."""
+    return BigQueryReader(os.environ["GCP_PROJECT"], os.environ["BQ_DATASET"], _uid(update))
 
 
 def _enabled_sources():
@@ -309,7 +310,7 @@ async def cmd_records(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return
     lang = _lang(update)
-    rows = _bq().get_records(date.today() - timedelta(days=365))
+    rows = _bq(update).get_records(date.today() - timedelta(days=365))
     await _reply(update, analytics.render_records(lang, rows), parse_mode="HTML")
 
 
@@ -319,7 +320,7 @@ async def cmd_month(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     lang = _lang(update)
     today = date.today()
     prev_end = today.replace(day=1) - timedelta(days=1)
-    bq = _bq()
+    bq = _bq(update)
     text = analytics.render_month(lang, today, bq.get_period(today.replace(day=1), today),
                                   bq.get_period(prev_end.replace(day=1), prev_end))
     await _reply(update, text, parse_mode="HTML")
@@ -338,7 +339,7 @@ async def _send_compare(update: Update, span: str):
     lang = _lang(update)
     today = date.today()
     (a0, a1), (b0, b1) = analytics.periods(span, today)
-    bq = _bq()
+    bq = _bq(update)
     text = analytics.render_compare(lang, span, today, bq.get_period(a0, a1), bq.get_period(b0, b1))
     await _reply(update, text, parse_mode="HTML")
 
@@ -355,7 +356,7 @@ async def cmd_charts(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def _send_chart(update: Update, name: str):
     lang = _lang(update)
-    png = charts.render(name, lang, _bq())
+    png = charts.render(name, lang, _bq(update))
     await update.effective_message.reply_photo(InputFile(png, filename=f"{name}.png"))
 
 
@@ -384,10 +385,10 @@ async def _stored(update: Update, lang: str, action) -> bool:
         return False
 
 
-def _athlete_inputs() -> dict:
+def _athlete_inputs(update: Update) -> dict:
     """Watch zones, threshold trend and Garmin resting HR; {} if BigQuery can't answer."""
     try:
-        return _bq().get_athlete_inputs()
+        return _bq(update).get_athlete_inputs(update)
     except Exception as e:  # noqa: BLE001
         logger.error("athlete inputs read failed: %s", e)
         return {}
@@ -423,7 +424,7 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE, edit: bool
     if not await _guard(update):
         return
     user = _user(update)
-    await _show(update, *render_profile(_lang(update, user), user.get("profile") or {}, _athlete_inputs()),
+    await _show(update, *render_profile(_lang(update, user), user.get("profile") or {}, _athlete_inputs(update)),
                 edit=edit)
 
 
@@ -487,7 +488,7 @@ async def cmd_today(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return
     lang = _lang(update)
-    bq = _bq()
+    bq = _bq(update)
     act = bq.get_last_activity()
     health = bq.get_health_last_days(4)
     loads = bq.get_load_last_days(1)
@@ -507,7 +508,7 @@ async def cmd_week(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return
     lang = _lang(update)
-    acts = _bq().get_week_activities()
+    acts = _bq(update).get_week_activities()
     if not acts:
         await _reply(update, t(lang, "week.empty"))
         return
@@ -522,7 +523,7 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not await _guard(update):
         return
     lang = _lang(update)
-    rows = _bq().get_source_status()
+    rows = _bq(update).get_source_status()
     enabled = _enabled_sources()
     lines = [t(lang, "status.sources", list=", ".join(enabled) or "—")]
     for r in rows:
@@ -563,7 +564,7 @@ async def _ai_reply(update: Update, prompt: str, label: str, task: str, **fmt):
         logger.error("goal read failed: %s", e)
         goal = None
     profile = user.get("profile") or {}
-    inputs = _athlete_inputs()
+    inputs = _athlete_inputs(update)
     lthr_then = ((inputs["lthr_then"], str(inputs["lthr_then_date"]))
                  if inputs.get("lthr_then") and inputs.get("lthr_then_date") else None)
     athlete = athlete_note(profile, goal, date.today(),
@@ -571,7 +572,7 @@ async def _ai_reply(update: Update, prompt: str, label: str, task: str, **fmt):
                            garmin_resting_hr=inputs.get("resting_hr_7d"), lthr_then=lthr_then)
     await _reply(update, t(lang, "ai.working", label=t(lang, f"ai.label.{label}")))
     try:
-        answer = analyze(_llm(), prompt, _context(_bq()), task, lang, mode=mode, athlete=athlete, **fmt)
+        answer = analyze(_llm(), prompt, _context(_bq(update)), task, lang, mode=mode, athlete=athlete, **fmt)
         _record_usage(update, answer)
         if not answer.text:
             await _reply(update, t(lang, "ai.error"))
@@ -609,7 +610,7 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if pending:
         lang = _lang(update, user)
         try:
-            watch = _athlete_inputs() if pending.get("kind") == "profile" else None
+            watch = _athlete_inputs(update) if pending.get("kind") == "profile" else None
             text, kb = handle_input(_store(), _uid(update), lang, pending, update.message.text, date.today(),
                                     watch)
         except Exception as e:  # noqa: BLE001

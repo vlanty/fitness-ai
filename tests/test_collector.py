@@ -69,42 +69,43 @@ def setup_function():
 
 def test_incremental_run_uses_cursor_minus_lookback_and_advances():
     bq, st = FakeBQ(), FakeState(cursor=date.today() - timedelta(days=1))
-    assert collector.run_source("fake", {}, bq, st, None)
+    assert collector.run_source("fake", {}, bq, st, None, "u-1")
     assert Recorder.seen == [(date.today() - timedelta(days=4), date.today())]
     assert st.records[-1] == ("fake", date.today(), "ok")
 
 
 def test_first_run_loads_first_sync_days():
-    collector.run_source("fake", {"FIRST_SYNC_DAYS": "10"}, FakeBQ(), FakeState(), None)
+    collector.run_source("fake", {"FIRST_SYNC_DAYS": "10"}, FakeBQ(), FakeState(), None, "u-1")
     assert Recorder.seen[0][0] == date.today() - timedelta(days=10)
 
 
 def test_failure_does_not_move_cursor_and_returns_false():
     Recorder.fail = RuntimeError("api down")
     st = FakeState(cursor=date(2026, 1, 1))
-    assert not collector.run_source("fake", {}, FakeBQ(), st, None)
+    assert not collector.run_source("fake", {}, FakeBQ(), st, None, "u-1")
     assert st.records == [("fake", None, "failed")]
 
 
 def test_partial_saves_what_arrived():
     Recorder.fail = PartialFetch(Batch(health_daily=[{"source": "fake", "date": "2026-01-01"}]), ["hrv: 500"])
     bq, st = FakeBQ(), FakeState(cursor=date.today())
-    assert not collector.run_source("fake", {}, bq, st, None)
+    assert not collector.run_source("fake", {}, bq, st, None, "u-1")
     assert ("health_daily", [{"source": "fake", "date": "2026-01-01"}]) in bq.upserts
     assert st.records[-1][2] == "partial"
 
 
 def test_missing_secret_fails_source_only():
     st = FakeState()
-    assert not collector.run_source("garmin", {}, FakeBQ(), st, None)
+    assert not collector.run_source("garmin", {}, FakeBQ(), st, None, "u-1")
     assert st.records[-1][2] == "failed"
 
 
 def test_main_exit_code_reflects_failures(monkeypatch):
-    monkeypatch.setattr(collector, "BigQueryWriter", lambda p, d: type("W", (), {"client": None, "table": lambda s, n: n})())
-    monkeypatch.setattr(collector, "IngestState", lambda c, t: None)
+    monkeypatch.setattr(collector, "BigQueryWriter", lambda p, d, u: type("W", (), {"client": None, "table": lambda s, n: n})())
+    monkeypatch.setattr(collector, "IngestState", lambda c, t, u: None)
     monkeypatch.setattr(collector, "run_source", lambda n, *a: n == "fake")
     monkeypatch.setenv("GCP_PROJECT", "p"); monkeypatch.setenv("BQ_DATASET", "d")
+    monkeypatch.setenv("OWNER_USER_ID", "u-1")
     monkeypatch.setenv("DATA_SOURCES", "fake")
     assert collector.main() == 0
     monkeypatch.setenv("DATA_SOURCES", "fake,garmin")
@@ -113,5 +114,32 @@ def test_main_exit_code_reflects_failures(monkeypatch):
 
 def test_file_paths_dropped_when_no_bucket():
     bq = FakeBQ()
-    collector.save(bq, None, Batch(activities=[{"activity_id": "1", "raw_file": "garmin/activities/1.zip"}]))
+    collector.save(bq, None, Batch(activities=[{"activity_id": "1", "raw_file": "garmin/activities/1.zip"}]), "u-1")
     assert bq.upserts[0][1][0]["raw_file"] is None
+
+
+class FakeBucket:
+    def __init__(self):
+        self.paths = []
+
+    def blob(self, path):
+        bucket = self
+        class B:
+            def upload_from_string(self, content, content_type=None):
+                bucket.paths.append(path)
+        return B()
+
+
+def test_raw_files_go_to_the_users_folder():
+    from secondwind.apps.collector.sources.base import RawFile
+    bq, bucket = FakeBQ(), FakeBucket()
+    collector.save(bq, bucket, Batch(activities=[{"activity_id": "1", "raw_file": "garmin/activities/1.zip"}],
+                                     files=[RawFile("garmin/activities/1.zip", b"x", "application/zip")]), "u-1")
+    assert bucket.paths == ["users/u-1/garmin/activities/1.zip"]
+    assert bq.upserts[0][1][0]["raw_file"] == "users/u-1/garmin/activities/1.zip"
+
+
+def test_main_needs_owner_user_id(monkeypatch):
+    monkeypatch.setenv("DATA_SOURCES", "fake")
+    monkeypatch.delenv("OWNER_USER_ID", raising=False)
+    assert collector.main() == 2
