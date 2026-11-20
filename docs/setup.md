@@ -45,7 +45,8 @@ gcloud config set project YOUR_PROJECT_ID
    ```
 4. **Images and the rest:**
    ```bash
-   REGION=europe-west3; BASE="${REGION}-docker.pkg.dev/$(gcloud config get-value project)/fitness-ai"
+   REGION=europe-west3   # your region from `setup.py config`
+   BASE="${REGION}-docker.pkg.dev/$(gcloud config get-value project)/fitness-ai"
    gcloud auth configure-docker ${REGION}-docker.pkg.dev
    docker build --platform linux/amd64 -t ${BASE}/collector:latest ../collector && docker push ${BASE}/collector:latest
    docker build --platform linux/amd64 -t ${BASE}/bot:latest ../bot && docker push ${BASE}/bot:latest
@@ -54,7 +55,7 @@ gcloud config set project YOUR_PROJECT_ID
    ```
 5. **History** (optional, one-off):
    ```bash
-   gcloud run jobs execute fitness-collector --region europe-west3 --update-env-vars BACKFILL_FROM=2024-01-01
+   gcloud run jobs execute fitness-collector --region ${REGION} --update-env-vars BACKFILL_FROM=2024-01-01
    ```
 
 Secret values never go into `terraform.tfvars` or Terraform state; Terraform only manages the
