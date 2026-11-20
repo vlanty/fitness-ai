@@ -1,0 +1,53 @@
+[
+  {
+    "name": "user_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "session_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "lap_index",
+    "type": "INT64",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "kind",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "auto | manual | split | interval"
+  },
+  {
+    "name": "start_ts",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "end_ts",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "distance_m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "duration_s",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "attrs",
+    "type": "JSON",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "ingested_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  }
+]

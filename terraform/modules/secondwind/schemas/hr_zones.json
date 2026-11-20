@@ -1,0 +1,72 @@
+[
+  {
+    "name": "user_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "valid_from",
+    "type": "DATE",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "garmin | ... | calculated"
+  },
+  {
+    "name": "method",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "percent_max_hr | percent_hrr | percent_lthr | custom_bpm | threshold_3zone | vendor_unspecified"
+  },
+  {
+    "name": "sport",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "sport code; NULL = all sports"
+  },
+  {
+    "name": "zone_count",
+    "type": "INT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "bounds",
+    "type": "INT64",
+    "mode": "REPEATED",
+    "description": "Upper bounds z0..zN in bpm; zone n = bounds[n-1]..bounds[n]"
+  },
+  {
+    "name": "anchor_hr_max",
+    "type": "INT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "anchor_hr_rest",
+    "type": "INT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "anchor_lthr",
+    "type": "INT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "session_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Session the zones were read from"
+  },
+  {
+    "name": "attrs",
+    "type": "JSON",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "ingested_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  }
+]

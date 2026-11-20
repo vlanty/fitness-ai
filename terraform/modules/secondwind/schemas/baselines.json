@@ -1,0 +1,78 @@
+[
+  {
+    "name": "user_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "metric",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "vendor",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Effective vendor (origin-aware)"
+  },
+  {
+    "name": "method",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "method_version",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "epoch_start",
+    "type": "DATE",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "as_of",
+    "type": "DATE",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "window_days",
+    "type": "INT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "n",
+    "type": "INT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "mean",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "sd",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "low",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "high",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "computed_by",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "computed_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  }
+]

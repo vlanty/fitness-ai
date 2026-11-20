@@ -1,0 +1,219 @@
+[
+  {
+    "name": "observation_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Deterministic hash of the key fields (see secondwind/core/observations.py); MERGE key"
+  },
+  {
+    "name": "user_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Integration that delivered the row (garmin, healthkit, calculated, ...)"
+  },
+  {
+    "name": "origin_app",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "App that wrote the value into an aggregator (HealthKit / Health Connect)"
+  },
+  {
+    "name": "origin_device",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Device model as reported"
+  },
+  {
+    "name": "device_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "-> devices.device_id"
+  },
+  {
+    "name": "metric",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Code from metric_registry, or x.<source>.<path> for unmapped vendor fields"
+  },
+  {
+    "name": "method",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Code from method_registry"
+  },
+  {
+    "name": "method_version",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Vendor algorithm or module version; a change starts a new baseline epoch"
+  },
+  {
+    "name": "value_num",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "value_text",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "value_bool",
+    "type": "BOOL",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "value_json",
+    "type": "JSON",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "unit",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Canonical UCUM unit of the metric"
+  },
+  {
+    "name": "value_orig",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Value as the vendor sent it"
+  },
+  {
+    "name": "unit_orig",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "start_ts",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "UTC"
+  },
+  {
+    "name": "end_ts",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "UTC"
+  },
+  {
+    "name": "tz_offset_min",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Local offset from UTC at start_ts"
+  },
+  {
+    "name": "local_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Day the value belongs to, see date_rule"
+  },
+  {
+    "name": "date_rule",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "wake_date | local_calendar | vendor_day"
+  },
+  {
+    "name": "granularity",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "instant | epoch | session | daily | rolling"
+  },
+  {
+    "name": "aggregate",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "mean | min | max | sum | last | count"
+  },
+  {
+    "name": "window_seconds",
+    "type": "INT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "context",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "sleep | workout | rest | spot_test | all_day | pre_sleep | environment"
+  },
+  {
+    "name": "session_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "-> sessions.session_id"
+  },
+  {
+    "name": "is_estimate",
+    "type": "BOOL",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "confidence",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "0..1 if the vendor reports it"
+  },
+  {
+    "name": "calibrating",
+    "type": "BOOL",
+    "mode": "NULLABLE",
+    "description": "Vendor says the value is still learning the user"
+  },
+  {
+    "name": "user_entered",
+    "type": "BOOL",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "as_of_ts",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "When this revision of an intraday-changing value was taken"
+  },
+  {
+    "name": "vendor_field",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Path of the value in the vendor payload"
+  },
+  {
+    "name": "raw_ref",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "gs:// object (+ #json-pointer) of the raw payload"
+  },
+  {
+    "name": "computed_by",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "vendor | secondwind:<module>@<version>"
+  },
+  {
+    "name": "derived_from",
+    "type": "STRING",
+    "mode": "REPEATED",
+    "description": "observation_id of the inputs (computed rows)"
+  },
+  {
+    "name": "ingest_run_id",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "ingested_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "attrs",
+    "type": "JSON",
+    "mode": "NULLABLE",
+    "description": "Open metadata: distance_m, zone, sport, vendor qualifiers, ..."
+  }
+]

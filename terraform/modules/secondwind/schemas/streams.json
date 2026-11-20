@@ -1,0 +1,86 @@
+[
+  {
+    "name": "user_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "session_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "NULL for series outside a session (CGM, all-day HR)"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "ts",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "offset_s",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Seconds since session start"
+  },
+  {
+    "name": "hr",
+    "type": "INT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "speed_mps",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "power_w",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "cadence",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "altitude_m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "lat",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "lon",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "distance_m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "temp_c",
+    "type": "FLOAT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "rr_ms",
+    "type": "INT64",
+    "mode": "REPEATED",
+    "description": "Beat-to-beat intervals in this sample"
+  },
+  {
+    "name": "extra",
+    "type": "JSON",
+    "mode": "NULLABLE",
+    "description": "Channels without a column yet"
+  }
+]

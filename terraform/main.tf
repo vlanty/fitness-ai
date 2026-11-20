@@ -136,6 +136,15 @@ module "bigquery" {
   depends_on   = [google_project_service.apis]
 }
 
+# The universal data model (dataset `secondwind`). The legacy dataset `fitness` above is frozen.
+module "secondwind" {
+  source       = "./modules/secondwind"
+  project_id   = var.gcp_project_id
+  data_sources = var.data_sources
+  registry_dir = "${path.root}/../secondwind/contracts/registry"
+  depends_on   = [google_project_service.apis]
+}
+
 module "cloud_run" {
   source            = "./modules/cloud_run"
   project_id        = var.gcp_project_id

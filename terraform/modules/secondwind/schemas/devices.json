@@ -1,0 +1,69 @@
+[
+  {
+    "name": "device_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "user_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "vendor",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "model",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "generation",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "firmware",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "device_class",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "watch | ring | band | chest_strap | cgm | scale | phone | bed_sensor"
+  },
+  {
+    "name": "wear_location",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "wrist | finger | chest | upper_arm | room | bedside | unknown"
+  },
+  {
+    "name": "active_from",
+    "type": "DATE",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "active_to",
+    "type": "DATE",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "attrs",
+    "type": "JSON",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "updated_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  }
+]

@@ -23,6 +23,7 @@ REVISION = {"immutable", "latest_wins", "keep_revisions"}
 EVIDENCE = {"documented", "inferred", "unknown"}
 STATUS = {"active", "deprecated"}
 SOURCE_STATUS = {"supported", "planned", "unsupported"}
+COLUMN_TYPES = {"INT64", "FLOAT64", "STRING"}
 UNMAPPED_PREFIX = "x."          # x.<source>.<path>: a vendor field no plugin maps yet
 
 
@@ -107,6 +108,19 @@ class Registry:
                 err.append(f"metric {code}: no group")
             if code.startswith("vendor_score.") and not m.get("proprietary"):
                 err.append(f"metric {code}: vendor scores must be proprietary")
+        for view in ("daily_column", "workout_column"):
+            cols: dict[str, str] = {}
+            for code, m in self.metrics.items():
+                col = m.get(view)
+                if not col:
+                    continue
+                if col in cols:
+                    err.append(f"{view} {col}: used by {cols[col]} and {code}")
+                cols[col] = code
+                if m.get("column_type") not in COLUMN_TYPES:
+                    err.append(f"metric {code}: column_type {m.get('column_type')!r}")
+                if (m.get("column_type") == "STRING") != (m.get("value_type") == "text"):
+                    err.append(f"metric {code}: column_type does not match value_type")
         for code, m in self.methods.items():
             if m.get("evidence") not in EVIDENCE:
                 err.append(f"method {code}: evidence {m.get('evidence')!r}")

@@ -1,0 +1,39 @@
+[
+  {
+    "name": "user_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "cursor_date",
+    "type": "DATE",
+    "mode": "NULLABLE",
+    "description": "Last fully synced day"
+  },
+  {
+    "name": "last_run_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "last_success_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "last_status",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "ok | partial | failed"
+  },
+  {
+    "name": "last_error",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  }
+]
