@@ -36,24 +36,24 @@ class BigQueryReader:
         return [dict(row) for row in self.client.query(sql, job_config=cfg).result()]
 
     def get_last_activity(self) -> dict | None:
-        rows = self._q(f"SELECT * FROM `{self.prefix}.activities_unified` "
+        rows = self._q(f"SELECT * FROM `{self.prefix}.v_activities` "
                        "WHERE user_id = @uid ORDER BY activity_date DESC, start_time DESC LIMIT 1")
         return rows[0] if rows else None
 
     def get_week_activities(self, weeks_back: int = 0) -> list[dict]:
         today = date.today()
         monday = today - timedelta(days=today.weekday() + weeks_back * 7)
-        return self._q(f"SELECT * FROM `{self.prefix}.activities_unified` "
+        return self._q(f"SELECT * FROM `{self.prefix}.v_activities` "
                        "WHERE user_id = @uid AND activity_date BETWEEN @mon AND @sun ORDER BY activity_date, start_time",
                        mon=monday, sun=monday + timedelta(days=6))
 
     def get_health_last_days(self, days: int = 14) -> list[dict]:
-        return self._q(f"SELECT * FROM `{self.prefix}.health_daily_unified` "
+        return self._q(f"SELECT * FROM `{self.prefix}.v_daily_health` "
                        "WHERE user_id = @uid AND date >= @since ORDER BY date",
                        since=date.today() - timedelta(days=days))
 
     def get_load_last_days(self, days: int = 1) -> list[dict]:
-        return self._q(f"SELECT * FROM `{self.prefix}.training_load_daily` "
+        return self._q(f"SELECT * FROM `{self.prefix}.v_training_load_daily` "
                        "WHERE user_id = @uid AND date > @since ORDER BY date",
                        since=date.today() - timedelta(days=days))
 
@@ -62,15 +62,18 @@ class BigQueryReader:
     RECORD_DISTANCES = (1000, 1609, 5000, 10000, 21098, 42195)
 
     def get_records(self, since: date) -> list[dict]:
-        """Best split per distance, all-time and since `since`, from Garmin's fastestSplit_<m>.
-        Splits faster than 2:30/km are treated as GPS glitches."""
-        cases = " ".join(f"WHEN {d} THEN JSON_VALUE(raw_json, '$.fastestSplit_{d}')" for d in self.RECORD_DISTANCES)
+        """Best effort per distance within runs (workout.best_effort_time), all-time and since
+        `since`. Efforts faster than 2:30/km are treated as GPS glitches."""
         dists = ", ".join(map(str, self.RECORD_DISTANCES))
         return self._q(f"""
             WITH s AS (
-              SELECT d, activity_date, name, SAFE_CAST(CASE d {cases} END AS FLOAT64) AS secs
-              FROM `{self.prefix}.activities`, UNNEST([{dists}]) AS d
-              WHERE user_id = @uid AND source = 'garmin' AND IFNULL(type, '') LIKE '%running%'),
+              SELECT CAST(JSON_VALUE(o.attrs, '$.distance_m') AS INT64) AS d, a.activity_date, a.name,
+                     o.value_num AS secs
+              FROM `{self.prefix}.observations` o
+              JOIN `{self.prefix}.v_activities` a ON a.session_id = o.session_id
+              WHERE o.user_id = @uid AND a.user_id = @uid AND o.metric = 'workout.best_effort_time'
+                AND IFNULL(a.type, '') LIKE '%running%'
+                AND CAST(JSON_VALUE(o.attrs, '$.distance_m') AS INT64) IN ({dists})),
             ok AS (SELECT * FROM s WHERE secs > 0 AND secs / d * 1000 >= 150),
             best AS (
               SELECT d, 'all' AS span, activity_date, name, secs,
@@ -85,12 +88,14 @@ class BigQueryReader:
         rows = self._q(f"""
             WITH a AS (
               SELECT *, IFNULL(type, '') LIKE '%running%' AS is_run
-              FROM `{self.prefix}.activities_unified`
+              FROM `{self.prefix}.v_activities`
               WHERE user_id = @uid AND activity_date BETWEEN @start AND @end),
             z AS (
-              SELECT {", ".join(f"SUM(SAFE_CAST(JSON_VALUE(raw_json, '$.hrTimeInZone_{i}') AS FLOAT64)) AS z{i}" for i in range(1, 6))}
-              FROM `{self.prefix}.activities`
-              WHERE user_id = @uid AND source = 'garmin' AND activity_date BETWEEN @start AND @end)
+              SELECT {", ".join(f"SUM(IF(JSON_VALUE(o.attrs, '$.zone') = '{i}', o.value_num, NULL)) AS z{i}" for i in range(1, 6))}
+              FROM `{self.prefix}.observations` o
+              JOIN `{self.prefix}.v_activities` w ON w.session_id = o.session_id
+              WHERE o.user_id = @uid AND w.user_id = @uid AND o.metric = 'workout.time_in_hr_zone'
+                AND w.activity_date BETWEEN @start AND @end)
             SELECT
               COUNT(*) AS n, COUNTIF(is_run) AS runs,
               SUM(IFNULL(duration_seconds, 0)) AS secs,
@@ -115,17 +120,17 @@ class BigQueryReader:
         return self._q(f"""
             SELECT w AS week, IFNULL(SUM(distance_meters) / 1000, 0) AS km
             FROM UNNEST(GENERATE_DATE_ARRAY(DATE_SUB(@monday, INTERVAL {weeks - 1} WEEK), @monday, INTERVAL 1 WEEK)) AS w
-            LEFT JOIN `{self.prefix}.activities_unified` a
+            LEFT JOIN `{self.prefix}.v_activities` a
               ON a.user_id = @uid AND DATE_TRUNC(a.activity_date, WEEK(MONDAY)) = w AND IFNULL(a.type, '') LIKE '%running%'
             GROUP BY w ORDER BY w""", monday=monday)
 
     def get_load_series(self, days: int = 120) -> list[dict]:
-        return self._q(f"SELECT date, acute_load, chronic_load FROM `{self.prefix}.training_load_daily` "
+        return self._q(f"SELECT date, acute_load, chronic_load FROM `{self.prefix}.v_training_load_daily` "
                        "WHERE user_id = @uid AND date > @since ORDER BY date", since=date.today() - timedelta(days=days))
 
     def get_health_series(self, days: int = 90) -> list[dict]:
         return self._q(f"SELECT date, hrv_last_night, hrv_baseline_low, hrv_baseline_high, resting_hr "
-                       f"FROM `{self.prefix}.health_daily_unified` WHERE user_id = @uid AND date > @since ORDER BY date",
+                       f"FROM `{self.prefix}.v_daily_health` WHERE user_id = @uid AND date > @since ORDER BY date",
                        since=date.today() - timedelta(days=days))
 
     def get_run_efficiency(self, days: int = 180) -> list[dict]:
@@ -133,7 +138,7 @@ class BigQueryReader:
         return self._q(f"""
             SELECT activity_date AS date,
                    (distance_meters / duration_seconds * 60) / avg_heart_rate AS m_per_beat
-            FROM `{self.prefix}.activities_unified`
+            FROM `{self.prefix}.v_activities`
             WHERE user_id = @uid AND IFNULL(type, '') LIKE '%running%' AND activity_date > @since
               AND distance_meters >= 3000 AND duration_seconds > 0 AND avg_heart_rate >= 90
             ORDER BY activity_date""", since=date.today() - timedelta(days=days))
@@ -146,17 +151,17 @@ class BigQueryReader:
         rows = self._q(f"""
             WITH z AS (
               SELECT activity_date AS zones_date, type AS zones_type, hr_zone_calc, hr_zone_bounds, lthr
-              FROM `{self.prefix}.activities`
+              FROM `{self.prefix}.v_activities`
               WHERE user_id = @uid AND hr_zone_bounds IS NOT NULL
               ORDER BY {RUN_FIRST} DESC, start_time DESC LIMIT 1),
             old AS (
               SELECT lthr AS lthr_then, activity_date AS lthr_then_date
-              FROM `{self.prefix}.activities`
+              FROM `{self.prefix}.v_activities`
               WHERE user_id = @uid AND lthr IS NOT NULL AND activity_date <= DATE_SUB(@today, INTERVAL 30 DAY)
               ORDER BY {RUN_FIRST} DESC, ABS(DATE_DIFF(activity_date, DATE_SUB(@today, INTERVAL 90 DAY), DAY)) LIMIT 1),
             r AS (
               SELECT CAST(ROUND(AVG(resting_hr)) AS INT64) AS resting_hr_7d
-              FROM `{self.prefix}.health_daily_unified`
+              FROM `{self.prefix}.v_daily_health`
               WHERE user_id = @uid AND date > DATE_SUB(@today, INTERVAL 7 DAY) AND resting_hr IS NOT NULL)
             SELECT * FROM r LEFT JOIN z ON TRUE LEFT JOIN old ON TRUE""", today=date.today())
         return rows[0] if rows else {}

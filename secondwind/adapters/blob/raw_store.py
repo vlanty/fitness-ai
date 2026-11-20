@@ -12,10 +12,11 @@ from datetime import datetime, timezone
 
 
 class RawStore:
-    """Writes to a GCS bucket; with bucket=None it only records what would be stored (tests, dry runs)."""
+    """Writes to a GCS bucket. bucket=None stores nothing and returns no refs (tests).
+    upload=False points at objects that are already there (re-processing, rehearsals)."""
 
-    def __init__(self, bucket, user_id: str, source: str, run_id: str | None = None) -> None:
-        self.bucket, self.user_id, self.source, self.run_id = bucket, user_id, source, run_id
+    def __init__(self, bucket, user_id: str, source: str, run_id: str | None = None, upload: bool = True) -> None:
+        self.bucket, self.user_id, self.source, self.run_id, self.upload = bucket, user_id, source, run_id, upload
         self.rows: list[dict] = []
 
     def path(self, path: str) -> str:
@@ -25,8 +26,10 @@ class RawStore:
         if self.bucket is None:
             return None
         full = self.path(path)
-        self.bucket.blob(full).upload_from_string(content, content_type=content_type)
         ref = f"gs://{self.bucket.name}/{full}"
+        if not self.upload:
+            return ref
+        self.bucket.blob(full).upload_from_string(content, content_type=content_type)
         self.rows.append({
             "user_id": self.user_id, "source": self.source, "endpoint": endpoint,
             "window_start": day, "window_end": day, "object_path": ref,

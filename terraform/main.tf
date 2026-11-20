@@ -151,7 +151,7 @@ module "cloud_run" {
   region            = var.gcp_region
   service_account   = google_service_account.runner.email
   image_base        = "${var.gcp_region}-docker.pkg.dev/${var.gcp_project_id}/fitness-ai"
-  bq_dataset        = module.bigquery.dataset_id
+  bq_dataset        = module.secondwind.dataset_id
   data_sources      = var.data_sources
   raw_bucket        = google_storage_bucket.raw.name
   bot_secrets       = local.core_secrets
@@ -160,7 +160,7 @@ module "cloud_run" {
   bot_language      = var.bot_language
   owner_user_id     = var.owner_user_id
   tenancy           = var.tenancy
-  depends_on        = [module.secrets, module.bigquery, google_artifact_registry_repository.repo]
+  depends_on        = [module.secrets, module.secondwind, google_artifact_registry_repository.repo]
 }
 
 module "scheduler" {

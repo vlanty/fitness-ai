@@ -33,7 +33,8 @@ a AS (
     s.start_ts AS start_time, s.name, s.sport_vendor AS type, s.sport, s.device_id,
     m.* EXCEPT (session_id),
     z.z.method AS hr_zone_calc,
-    ARRAY_TO_STRING(ARRAY(SELECT CAST(b AS STRING) FROM UNNEST(z.z.bounds) AS b WITH OFFSET i ORDER BY i), ',') AS hr_zone_bounds,
+    IF(z.z IS NULL, NULL,
+       ARRAY_TO_STRING(ARRAY(SELECT CAST(b AS STRING) FROM UNNEST(z.z.bounds) AS b WITH OFFSET i ORDER BY i), ',')) AS hr_zone_bounds,
     z.z.anchor_lthr AS lthr, z.z.anchor_hr_max AS fit_max_hr, z.z.anchor_hr_rest AS fit_resting_hr,
     z.z.valid_from AS zones_date,
     ${priority} AS _rank
