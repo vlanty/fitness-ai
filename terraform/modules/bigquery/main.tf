@@ -6,7 +6,7 @@ resource "google_bigquery_dataset" "fitness" {
 
 locals {
   # Source priority for de-duplication: first in var.data_sources wins.
-  # Sources no longer enabled (e.g. historical Strava rows) rank last.
+  # Sources no longer enabled (e.g. a watch you no longer use) rank last.
   priority_sql = "CASE source ${join(" ", [for i, s in var.data_sources : "WHEN '${s}' THEN ${i}"])} ELSE 999 END"
 
   health_fields = [

@@ -29,7 +29,6 @@ TFVARS = TF_DIR / "terraform.tfvars"
 
 SOURCES = {
     "garmin": "Garmin Connect — официальный Personal API (личный ключ)",
-    "strava": "Strava — OAuth-приложение и refresh-токен",
 }
 
 # Where to get each secret value.
@@ -41,9 +40,6 @@ SECRET_HELP = {
     "anthropic_api_key": "console.anthropic.com → API Keys.",
     "garmin_personal_api_key": "connect.garmin.com/app/settings/personalApiToken → Create Key. "
                                "Ключ показывается один раз; срок 30/90/180 дней или 1 год.",
-    "strava_client_id": "strava.com/settings/api → Client ID.",
-    "strava_client_secret": "strava.com/settings/api → Client Secret.",
-    "strava_refresh_token": "Запустите python3 scripts/strava_auth.py.",
 }
 
 

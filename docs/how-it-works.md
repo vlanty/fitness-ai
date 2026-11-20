@@ -17,9 +17,8 @@
 Cloud Scheduler (every 4 h)
         │
         ▼
-Cloud Run Job "collector"  ── DATA_SOURCES=garmin,strava (order = priority)
+Cloud Run Job "collector"  ── DATA_SOURCES=garmin (order = priority)
         │   sources/garmin.py ── Garmin Personal API (personal key → 24 h token)
-        │   sources/strava.py ── Strava API (OAuth refresh token)
         ├── raw files (.FIT) ──► GCS bucket <project>-fitness-raw
         ▼
 BigQuery dataset "fitness"
@@ -65,7 +64,7 @@ daily health from at least 25 months back were available when tested.
 - **`activities_unified`** removes duplicates. The same workout from two sources = start time
   within **±5 min** and moving *or* elapsed duration within **10 %**. The row from the source
   listed first in `data_sources` is kept; `also_in` shows where else it was found. Sources no
-  longer enabled (e.g. old Strava history) rank last, but their unique workouts stay visible.
+  longer enabled (e.g. a watch you no longer use) rank last, but their unique workouts stay visible.
 - **`health_daily_unified`** takes each field per day from the highest-priority source that
   has it.
 
@@ -120,7 +119,7 @@ The zones are the ones your watch uses. The collector reads them from each new .
 threshold HR), so the bot's zones match the watch and Garmin's time in zone. Garmin keeps zones
 per sport; the bot prefers the running ones.
 
-Without zones from the watch (e.g. Strava only), the bot falls back in this order:
+Without zones from the watch (e.g. a source without .FIT files), the bot falls back in this order:
 
 1. threshold HR from `/profile` (Friel zones);
 2. Karvonen, with resting HR from Garmin's 7-day average;

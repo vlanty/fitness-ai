@@ -140,7 +140,7 @@ class BigQueryReader:
 
     def get_athlete_inputs(self) -> dict:
         """Watch HR zones from the latest .FIT, the threshold ~90 days earlier, and Garmin's
-        7-day resting HR. Missing parts are None (e.g. Strava-only installs have no zones).
+        7-day resting HR. Missing parts are None (e.g. a source without .FIT files has no zones).
         Garmin keeps zones per sport: running zones are preferred (the coach is a running coach),
         any other activity's zones are the fallback."""
         rows = self._q(f"""

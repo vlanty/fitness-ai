@@ -27,7 +27,6 @@ locals {
   # Secrets per data source. Add a new source here (and in secondwind/apps/collector/sources).
   source_secrets = {
     garmin = ["garmin_personal_api_key"]
-    strava = ["strava_client_id", "strava_client_secret", "strava_refresh_token"]
   }
 
   collector_secrets = distinct(flatten([for s in var.data_sources : local.source_secrets[s]]))

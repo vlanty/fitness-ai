@@ -9,7 +9,7 @@
   🔒 data self-hosted · 💸 ~$1–2 a month, depending on how much you ask · 🌍 Russian and English
 </p>
 
-Meet **Vita**. She reads your Garmin and Strava data and answers like a coach, a sports doctor
+Meet **Vita**. She reads your Garmin data and answers like a coach, a sports doctor
 and a nutritionist who know your workouts, your sleep and your recovery. Ask in plain words and
 get an answer based on your own numbers, not generic advice.
 
@@ -29,8 +29,8 @@ marathon, and `/charts` for volume, load, HRV, resting HR and running efficiency
 🎯 **Coaching that fits you.** Set a race goal with `/goal`, and your age, weight, threshold and
 injuries with `/profile`. Heart-rate zones come straight from your watch.
 
-🔄 **Data collects itself.** Garmin and Strava sync every 4 hours, are merged without duplicates,
-and your full history is loaded on first install.
+🔄 **Data collects itself.** Garmin syncs every 4 hours, and your full history is loaded on
+first install.
 
 📦 **Your history stays when you switch.** New watch, or moving from Garmin to another supported
 service? Past workouts and health data stay in your own storage, and new data joins them.
@@ -53,7 +53,7 @@ a summary of it is sent to the AI model.
 
 | | |
 |---|---|
-| 🚀 [Setup](docs/setup.md) | install in Google Cloud, connect Garmin and Strava, bot settings |
+| 🚀 [Setup](docs/setup.md) | install in Google Cloud, connect Garmin, bot settings |
 | 🛠 [Operations](docs/operations.md) | updating, rotating keys and tokens, troubleshooting |
 | 🔬 [How it works](docs/how-it-works.md) | architecture, merging sources, how load, readiness, status and zones are calculated |
 | 🤖 [Commands](docs/commands.md) | every bot command and what it shows |
@@ -74,5 +74,5 @@ Second Wind is **source-available** under the [PolyForm Noncommercial License 1.
 - ❌ Charging users (subscriptions, paid access, ads or any other commercial use) needs a separate
   commercial license. To ask for one, [open an issue](https://github.com/vlanty/second-wind/issues).
 
-This is a plain-language summary; the [license text](LICENSE.md) is what applies. Garmin, Strava
+This is a plain-language summary; the [license text](LICENSE.md) is what applies. Garmin
 and AI-provider terms apply on top of it.

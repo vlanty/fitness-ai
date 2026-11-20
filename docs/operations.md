@@ -49,11 +49,6 @@ When the key has expired, been lost or leaked:
 2. `python3 scripts/setup.py secrets --update garmin_personal_api_key`
 3. Nothing else: the next collector run picks up the `latest` version.
 
-### Strava token
-
-If Strava starts returning `400` on `/oauth/token`, the token was revoked: re-run
-`python3 scripts/strava_auth.py`, then `python3 scripts/setup.py secrets --update strava_refresh_token`.
-
 ### Telegram bot token
 
 Copy the whole new token, digits before the colon included.

@@ -3,7 +3,7 @@
 Env:
   GCP_PROJECT, BQ_DATASET      target dataset
   OWNER_USER_ID                whose data this is (solo mode: the one owner)
-  DATA_SOURCES                 comma list, e.g. "garmin,strava" (order = priority, used by views)
+  DATA_SOURCES                 comma list, e.g. "garmin" (order = priority, used by views)
   RAW_BUCKET                   GCS bucket for raw files (.FIT); optional
   BACKFILL_FROM=YYYY-MM-DD     one-off history load from this date (ignores cursor)
   FIRST_SYNC_DAYS              days to load when a source has no cursor yet (default 30)
