@@ -1,0 +1,30 @@
+[
+  {
+    "name": "kind",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "metric | method | unit | sport | source | origin | module"
+  },
+  {
+    "name": "code",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "entry",
+    "type": "JSON",
+    "mode": "REQUIRED",
+    "description": "The registry entry as in secondwind/contracts/registry"
+  },
+  {
+    "name": "registry_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Git commit the registry was loaded from"
+  },
+  {
+    "name": "loaded_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  }
+]

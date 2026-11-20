@@ -1,0 +1,103 @@
+[
+  {
+    "name": "session_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "<source>:<kind>:<vendor id>"
+  },
+  {
+    "name": "user_id",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "kind",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "workout | sleep | nap | spot_test | assessment"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "origin_app",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "origin_device",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "device_id",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "vendor_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Id of the session at the vendor"
+  },
+  {
+    "name": "start_ts",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "end_ts",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "tz_offset_min",
+    "type": "INT64",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "local_date",
+    "type": "DATE",
+    "mode": "REQUIRED"
+  },
+  {
+    "name": "sport",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "sport_registry code (workouts)"
+  },
+  {
+    "name": "sport_vendor",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Vendor's own type name"
+  },
+  {
+    "name": "name",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "is_main",
+    "type": "BOOL",
+    "mode": "NULLABLE",
+    "description": "Main sleep of the night (sleep), primary record"
+  },
+  {
+    "name": "raw_ref",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "attrs",
+    "type": "JSON",
+    "mode": "NULLABLE"
+  },
+  {
+    "name": "ingested_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED"
+  }
+]

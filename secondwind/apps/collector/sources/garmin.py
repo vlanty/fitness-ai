@@ -13,6 +13,7 @@ Endpoints and field paths were verified against real responses
 
 from __future__ import annotations
 
+import json
 import logging
 import random
 import time
@@ -23,6 +24,7 @@ import requests
 from secondwind.apps.collector.fit_zones import extract_zones
 
 from .base import Batch, PartialFetch, RawFile, Source, to_json
+from .garmin_model import activity_to_model, fit_to_model, health_to_model
 
 logger = logging.getLogger(__name__)
 
@@ -319,3 +321,25 @@ class GarminSource(Source):
             raise PartialFetch(Batch(acts, health, files), self.partial_errors)
         return Batch(acts, health, files)
 
+    def to_model(self, user_id, batch, store):
+        """Activities, health days and .FIT files of a batch -> the universal model.
+        Same code for live syncs and for re-processing stored payloads."""
+        from secondwind.core.observations import ModelBatch
+
+        out = ModelBatch()
+        files = {f.path: f for f in batch.files}
+        for row in batch.activities:
+            raw = json.loads(row["raw_json"]) if row.get("raw_json") else {}
+            vid, day = row["activity_id"], row.get("activity_date")
+            raw_ref = store.put_json(f"garmin/raw/activities/{vid}.json", raw, "activities", day)
+            f = files.get(row.get("raw_file") or "")
+            fit_ref = store.put_bytes(f.path, f.content, f.content_type, "fit", day) if f else None
+            out.extend(activity_to_model(user_id, raw, raw_ref, fit_ref))
+            if f:
+                out.extend(fit_to_model(user_id, f"garmin:workout:{vid}", day, f.content))
+        for row in batch.health_daily:
+            parts = json.loads(row["raw_json"]) if row.get("raw_json") else {}
+            ref = store.put_json(f"garmin/raw/health/{row['date']}.json", parts, "health", row["date"])
+            out.extend(health_to_model(user_id, row["date"], parts, ref))
+        out.raw_payloads.extend(store.drain())
+        return out

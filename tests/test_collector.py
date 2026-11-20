@@ -28,10 +28,11 @@ def test_windows_cover_range_without_gaps():
 
 class FakeBQ:
     def __init__(self):
-        self.upserts = []
+        self.writes = []
 
-    def upsert(self, table, rows):
-        self.upserts.append((table, list(rows)))
+    def write(self, model):
+        self.writes.append(model)
+        return {"sessions": len(model.sessions)}
 
     def stored_file_ids(self, source, start):
         return set()
@@ -60,6 +61,11 @@ class Recorder(Source):
         if Recorder.fail:
             raise Recorder.fail
         return Batch(activities=[{"source": "fake", "activity_id": str(start)}])
+
+    def to_model(self, user_id, batch, store):
+        from secondwind.core.observations import ModelBatch
+        return ModelBatch(sessions=[{"session_id": f"fake:{a['activity_id']}"} for a in batch.activities],
+                          observations=[{"date": h["date"]} for h in batch.health_daily])
 
 
 def setup_function():
@@ -90,7 +96,7 @@ def test_partial_saves_what_arrived():
     Recorder.fail = PartialFetch(Batch(health_daily=[{"source": "fake", "date": "2026-01-01"}]), ["hrv: 500"])
     bq, st = FakeBQ(), FakeState(cursor=date.today())
     assert not collector.run_source("fake", {}, bq, st, None, "u-1")
-    assert ("health_daily", [{"source": "fake", "date": "2026-01-01"}]) in bq.upserts
+    assert any(m.observations == [{"date": "2026-01-01"}] for m in bq.writes)
     assert st.records[-1][2] == "partial"
 
 
@@ -101,7 +107,7 @@ def test_missing_secret_fails_source_only():
 
 
 def test_main_exit_code_reflects_failures(monkeypatch):
-    monkeypatch.setattr(collector, "BigQueryWriter", lambda p, d, u: type("W", (), {"client": None, "table": lambda s, n: n})())
+    monkeypatch.setattr(collector, "BigQueryModelWriter", lambda p, d, u: type("W", (), {"client": None, "table": lambda s, n: n})())
     monkeypatch.setattr(collector, "IngestState", lambda c, t, u: None)
     monkeypatch.setattr(collector, "run_source", lambda n, *a: n == "fake")
     monkeypatch.setenv("GCP_PROJECT", "p"); monkeypatch.setenv("BQ_DATASET", "d")
@@ -110,33 +116,6 @@ def test_main_exit_code_reflects_failures(monkeypatch):
     assert collector.main() == 0
     monkeypatch.setenv("DATA_SOURCES", "fake,garmin")
     assert collector.main() == 1
-
-
-def test_file_paths_dropped_when_no_bucket():
-    bq = FakeBQ()
-    collector.save(bq, None, Batch(activities=[{"activity_id": "1", "raw_file": "garmin/activities/1.zip"}]), "u-1")
-    assert bq.upserts[0][1][0]["raw_file"] is None
-
-
-class FakeBucket:
-    def __init__(self):
-        self.paths = []
-
-    def blob(self, path):
-        bucket = self
-        class B:
-            def upload_from_string(self, content, content_type=None):
-                bucket.paths.append(path)
-        return B()
-
-
-def test_raw_files_go_to_the_users_folder():
-    from secondwind.apps.collector.sources.base import RawFile
-    bq, bucket = FakeBQ(), FakeBucket()
-    collector.save(bq, bucket, Batch(activities=[{"activity_id": "1", "raw_file": "garmin/activities/1.zip"}],
-                                     files=[RawFile("garmin/activities/1.zip", b"x", "application/zip")]), "u-1")
-    assert bucket.paths == ["users/u-1/garmin/activities/1.zip"]
-    assert bq.upserts[0][1][0]["raw_file"] == "users/u-1/garmin/activities/1.zip"
 
 
 def test_main_needs_owner_user_id(monkeypatch):

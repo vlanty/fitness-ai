@@ -1,0 +1,3 @@
+# Apps and devices that write into aggregators (HealthKit, Health Connect). The effective
+# vendor of an observation that came through an aggregator is looked up here by origin_app.
+origins: []

@@ -1,7 +1,6 @@
--- One row per user and day. Each field comes from the highest-priority source that has
+-- One row per day. Each field comes from the highest-priority source that has
 -- a value for it that day (e.g. sleep from Garmin, weight from another source).
 SELECT
-  user_id,
   date,
   ARRAY_AGG(source ORDER BY _rank, source LIMIT 1)[OFFSET(0)] AS primary_source,
   ARRAY_AGG(DISTINCT source ORDER BY source) AS sources,
@@ -13,4 +12,4 @@ FROM (
   SELECT *, ${priority} AS _rank
   FROM `${table}`
 )
-GROUP BY user_id, date
+GROUP BY date

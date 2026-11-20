@@ -19,14 +19,18 @@ Cloud Scheduler (every 4 h)
         ▼
 Cloud Run Job "collector"  ── DATA_SOURCES=garmin (order = priority)
         │   sources/garmin.py ── Garmin Personal API (personal key → 24 h token)
-        ├── raw files (.FIT) ──► GCS bucket <project>-fitness-raw
+        │   sources/garmin_model.py ── every Garmin field → metric / method / unit (registries)
+        ├── raw payloads + .FIT, unchanged ──► GCS bucket <project>-fitness-raw, users/<user_id>/
         ▼
-BigQuery dataset "fitness"
-  tables: activities, health_daily      (one row per source + id/day, MERGE = idempotent)
-          ingest_state                  (cursor and last status per source)
-  views:  activities_unified            (duplicates across sources removed)
-          health_daily_unified          (each field from the highest-priority source)
-          training_load_daily           (acute/chronic load, ratio, focus, VO2 max trend)
+BigQuery dataset "secondwind" (universal model, every row has user_id)
+  observations   one row per value: metric, method, unit, time, context, source, provenance
+  sessions       workouts and sleep episodes; laps, sleep_stages, streams (per-second records)
+  hr_zones       watch zones with history; devices, user_events, baselines
+  ingest_state   sync cursor per user and source; raw_payloads: index of the raw store
+  views (generated from the metric registry, column names the bot uses):
+          v_daily_health        one source per metric group per day, never mixed
+          v_activities          workouts, duplicates across sources removed
+          v_training_load_daily acute/chronic load, ratio, focus, VO2 max trend (per load method)
         │
         ▼
 Cloud Run Service "bot" (Telegram webhook with secret token, owner chat only)
@@ -38,8 +42,10 @@ Cloud Run Service "bot" (Telegram webhook with secret token, owner chat only)
 Secrets: Secret Manager (values never in Terraform)   State: GCS bucket <project>-tfstate
 ```
 
-Cloud resources keep the short technical prefix `fitness-` (`fitness-bot`, `fitness-collector`,
-dataset `fitness`), so existing installs update in place without recreating anything.
+What every code means (metrics, methods, units, sports, sources) is defined in
+`secondwind/contracts/registry/*.yaml`; a new integration adds a source plugin and registry
+entries, not table columns. Cloud resources keep the short technical prefix `fitness-`
+(`fitness-bot`, `fitness-collector`).
 
 ## Collecting data
 

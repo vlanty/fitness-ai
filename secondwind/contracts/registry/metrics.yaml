@@ -1,0 +1,61 @@
+# One entry per metric code.
+#   value_type:  num | text | bool | json
+#   unit:        canonical unit (units.yaml)
+#   value_kind:  absolute | delta | score | count | category
+#   group:       metrics taken together from one source (no mixing within a group)
+#   comparable:  none | within_method | within_family   (across sources/devices)
+#   proprietary: vendor-defined scale; never compared across vendors
+#   revision:    immutable | latest_wins | keep_revisions  (value may change during the day)
+#   daily_column / workout_column: column name in the bot's wide views (v_daily_health /
+#                v_activities); column_type: INT64 | FLOAT64 | STRING. New metrics with a column
+#                appear in the views without editing SQL.
+metrics:
+  # ── HRV ──
+  - {code: hrv.night,            value_type: num, unit: ms, value_kind: absolute, group: hrv, comparable: within_method, description: "Night HRV summary (statistic and window in the method)", daily_column: hrv_last_night, column_type: INT64}
+  - {code: hrv.night_7d_mean,    value_type: num, unit: ms, value_kind: absolute, group: hrv, comparable: within_method, description: "Vendor 7-day average of the night value", daily_column: hrv_weekly_avg, column_type: INT64}
+  - {code: hrv.night_5min_high,  value_type: num, unit: ms, value_kind: absolute, group: hrv, comparable: within_method, daily_column: hrv_5min_high, column_type: INT64}
+  - {code: hrv.baseline_low,     value_type: num, unit: ms, value_kind: absolute, group: hrv, comparable: within_method, description: "Vendor personal normal range, lower bound", daily_column: hrv_baseline_low, column_type: INT64}
+  - {code: hrv.baseline_high,    value_type: num, unit: ms, value_kind: absolute, group: hrv, comparable: within_method, daily_column: hrv_baseline_high, column_type: INT64}
+  # ── heart ──
+  - {code: heart.resting,        value_type: num, unit: /min, value_kind: absolute, group: rhr, comparable: within_method, daily_column: resting_hr, column_type: INT64}
+  # ── sleep (the episode itself is a session) ──
+  - {code: sleep.duration.total, value_type: num, unit: s, value_kind: absolute, group: sleep, comparable: within_family, daily_column: sleep_seconds, column_type: INT64}
+  - {code: sleep.duration.deep,  value_type: num, unit: s, value_kind: absolute, group: sleep, comparable: within_method, daily_column: deep_sleep_seconds, column_type: INT64}
+  - {code: sleep.duration.light, value_type: num, unit: s, value_kind: absolute, group: sleep, comparable: within_method, daily_column: light_sleep_seconds, column_type: INT64}
+  - {code: sleep.duration.rem,   value_type: num, unit: s, value_kind: absolute, group: sleep, comparable: within_method, daily_column: rem_sleep_seconds, column_type: INT64}
+  - {code: sleep.duration.awake, value_type: num, unit: s, value_kind: absolute, group: sleep, comparable: within_method, daily_column: awake_seconds, column_type: INT64}
+  # ── breathing, oxygen, temperature ──
+  - {code: resp.rate,            value_type: num, unit: /min, value_kind: absolute, group: resp, comparable: within_method, daily_column: respiration_avg, column_type: FLOAT64}
+  - {code: spo2.mean,            value_type: num, unit: "%", value_kind: absolute, group: spo2, comparable: within_method, daily_column: spo2_avg, column_type: FLOAT64}
+  - {code: spo2.min,             value_type: num, unit: "%", value_kind: absolute, group: spo2, comparable: within_method, daily_column: spo2_min, column_type: FLOAT64}
+  - {code: temp.skin,            value_type: num, unit: Cel, value_kind: absolute, group: temp, comparable: within_method, daily_column: skin_temp_celsius, column_type: FLOAT64}
+  - {code: temp.skin_deviation,  value_type: num, unit: Cel, value_kind: delta, group: temp, comparable: within_method, daily_column: skin_temp_deviation_celsius, column_type: FLOAT64}
+  # ── daily movement and energy ──
+  - {code: activity.steps,       value_type: num, unit: "{count}", value_kind: count, group: movement, comparable: within_family, daily_column: steps, column_type: INT64}
+  - {code: energy.active,        value_type: num, unit: kcal, value_kind: absolute, group: movement, comparable: within_family, daily_column: active_calories, column_type: INT64}
+  # ── fitness ──
+  - {code: fitness.vo2max,       value_type: num, unit: mL/kg/min, value_kind: absolute, group: vo2max, comparable: within_method, description: "attrs.sport: run | bike | generic", daily_column: vo2max, column_type: FLOAT64, workout_column: vo2max}
+  - {code: fitness.vo2max_bike,   value_type: num, unit: mL/kg/min, value_kind: absolute, group: vo2max_bike, comparable: within_method, description: "Cycling VO2 max estimate"}
+  # ── workout summary (context: workout, session_id set) ──
+  - {code: workout.distance,         value_type: num, unit: m,    value_kind: absolute, group: workout, comparable: within_family, workout_column: distance_meters, column_type: FLOAT64}
+  - {code: workout.duration.moving,  value_type: num, unit: s,    value_kind: absolute, group: workout, comparable: within_method, workout_column: duration_seconds, column_type: INT64}
+  - {code: workout.duration.elapsed, value_type: num, unit: s,    value_kind: absolute, group: workout, comparable: within_family, workout_column: elapsed_seconds, column_type: INT64}
+  - {code: workout.elevation_gain,   value_type: num, unit: m,    value_kind: absolute, group: workout, comparable: within_method, workout_column: elevation_gain, column_type: FLOAT64}
+  - {code: workout.hr.mean,          value_type: num, unit: /min, value_kind: absolute, group: workout, comparable: within_family, workout_column: avg_heart_rate, column_type: INT64}
+  - {code: workout.hr.max,           value_type: num, unit: /min, value_kind: absolute, group: workout, comparable: within_family, workout_column: max_heart_rate, column_type: INT64}
+  - {code: workout.pace.mean,        value_type: num, unit: s/km, value_kind: absolute, group: workout, comparable: within_family, workout_column: avg_pace_sec_per_km, column_type: FLOAT64}
+  - {code: workout.energy,           value_type: num, unit: kcal, value_kind: absolute, group: workout, comparable: within_method, workout_column: calories, column_type: INT64}
+  - {code: workout.load,             value_type: num, unit: "{score}", value_kind: score, group: load, comparable: within_method, description: "Training load of one session; the model is in the method; never sum across methods", workout_column: training_load, column_type: FLOAT64}
+  - {code: workout.best_effort_time, value_type: num, unit: s,    value_kind: absolute, group: best_effort, comparable: within_method, description: "Fastest segment of attrs.distance_m within the session"}
+  - {code: workout.time_in_hr_zone,  value_type: num, unit: s,    value_kind: absolute, group: zones, comparable: within_method, description: "attrs.zone (1..5); zone bounds per the method / hr_zones"}
+  # ── vendor scores (proprietary, never compared across vendors) ──
+  - {code: vendor_score.garmin.sleep_score,          value_type: num,  unit: "{score}",    value_kind: score,    group: garmin_scores, comparable: none, proprietary: true, description: "0–100", daily_column: sleep_score, column_type: INT64}
+  - {code: vendor_score.garmin.hrv_status,           value_type: text, unit: "{category}", value_kind: category, group: hrv, comparable: none, proprietary: true, description: "BALANCED | UNBALANCED | LOW | POOR | NONE", daily_column: hrv_status, column_type: STRING}
+  - {code: vendor_score.garmin.stress_mean,          value_type: num,  unit: "{score}",    value_kind: score,    group: garmin_scores, comparable: none, proprietary: true, description: "0–100", daily_column: stress_avg, column_type: INT64}
+  - {code: vendor_score.garmin.body_battery_max,     value_type: num,  unit: "{score}",    value_kind: score,    group: garmin_scores, comparable: none, proprietary: true, description: "5–100", daily_column: body_battery_high, column_type: INT64}
+  - {code: vendor_score.garmin.body_battery_min,     value_type: num,  unit: "{score}",    value_kind: score,    group: garmin_scores, comparable: none, proprietary: true, daily_column: body_battery_low, column_type: INT64}
+  - {code: vendor_score.garmin.body_battery_charged, value_type: num,  unit: "{score}",    value_kind: score,    group: garmin_scores, comparable: none, proprietary: true, daily_column: body_battery_charged, column_type: INT64}
+  - {code: vendor_score.garmin.body_battery_drained, value_type: num,  unit: "{score}",    value_kind: score,    group: garmin_scores, comparable: none, proprietary: true, daily_column: body_battery_drained, column_type: INT64}
+  - {code: vendor_score.garmin.te_aerobic,           value_type: num,  unit: "{score}",    value_kind: score,    group: workout, comparable: none, proprietary: true, description: "Training Effect 0.0–5.0", workout_column: aerobic_te, column_type: FLOAT64}
+  - {code: vendor_score.garmin.te_anaerobic,         value_type: num,  unit: "{score}",    value_kind: score,    group: workout, comparable: none, proprietary: true, workout_column: anaerobic_te, column_type: FLOAT64}
+  - {code: vendor_score.garmin.te_label,             value_type: text, unit: "{category}", value_kind: category, group: workout, comparable: none, proprietary: true, description: "trainingEffectLabel, e.g. AEROBIC_BASE, TEMPO", workout_column: training_effect_label, column_type: STRING}
