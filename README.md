@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>A personal AI coach that lives in your Telegram.</b><br>
-  🔒 runs in your own Google Cloud project · 💸 about $1–2 a month · 🌍 Russian and English
+  🔒 data self-hosted · 💸 ~$1–2 a month, depending on how much you ask · 🌍 Russian and English
 </p>
 
 Meet **Vita**. She reads your Garmin and Strava data and answers like a coach, a sports doctor
@@ -31,6 +31,9 @@ injuries with `/profile`. Heart-rate zones come straight from your watch.
 
 🔄 **Data collects itself.** Garmin and Strava sync every 4 hours, are merged without duplicates,
 and your full history is loaded on first install.
+
+📦 **Your history stays when you switch.** New watch, or moving from Garmin to another supported
+service? Past workouts and health data stay in your own storage, and new data joins them.
 
 ⚙️ **You stay in control.** Pick the AI mode and see what it costs this month in `/settings`.
 Only your chat gets answers. Your data is stored only in your own cloud project; for AI answers,
