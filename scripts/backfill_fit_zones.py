@@ -6,7 +6,7 @@ Reads .FIT archives from the raw bucket and MERGEs only the zone columns
 (other columns are kept by the MERGE's COALESCE). Safe to re-run: activities
 that already have zones are skipped.
 
-  pip install -r collector/requirements.txt
+  pip install -r requirements/collector.txt
   python3 scripts/backfill_fit_zones.py --project YOUR_PROJECT [--dry-run]
 """
 
@@ -16,12 +16,12 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "collector"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from google.cloud import bigquery, storage  # noqa: E402
 
-from bq_writer import BigQueryWriter  # noqa: E402
-from fit_zones import extract_zones  # noqa: E402
+from secondwind.adapters.warehouse.bigquery_writer import BigQueryWriter  # noqa: E402
+from secondwind.apps.collector.fit_zones import extract_zones  # noqa: E402
 
 
 def main() -> None:

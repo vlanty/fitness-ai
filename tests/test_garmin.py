@@ -3,8 +3,8 @@ from datetime import date
 import pytest
 import requests
 
-from sources.base import PartialFetch
-from sources.garmin import GarminApiError, GarminClient, GarminSource, build_health, by_date, dig, parse_activity
+from secondwind.apps.collector.sources.base import PartialFetch
+from secondwind.apps.collector.sources.garmin import GarminApiError, GarminClient, GarminSource, build_health, by_date, dig, parse_activity
 
 
 class Resp:

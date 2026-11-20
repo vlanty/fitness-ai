@@ -31,9 +31,9 @@ BigQuery dataset "fitness"
         │
         ▼
 Cloud Run Service "bot" (Telegram webhook, owner chat only)
-        ├── bot/estimates.py ── readiness & training status (our estimates)
-        ├── bot/locales/    ── texts in ru / en
-        ├── bot/models.py   ── which Claude model does which task
+        ├── secondwind/core/estimates.py ── readiness & training status (our estimates)
+        ├── secondwind/core/locales/     ── texts in ru / en
+        ├── secondwind/core/models.py    ── which model tier does which task
         └── Claude API      (Sonnet 5.5 for questions and analysis, Haiku 5.5 for routine messages)
 
 Secrets: Secret Manager (values never in Terraform)   State: GCS bucket <project>-tfstate
@@ -105,7 +105,7 @@ part, per-activity EPOC load and training effect, comes from Garmin itself. The 
 ## Readiness and training status
 
 The bot shows **readiness** (0–100) and **training status** as *Second Wind's own estimates, not
-Garmin values*. They are transparent rules in `bot/estimates.py` over the same inputs Garmin lists:
+Garmin values*. They are transparent rules in `secondwind/core/estimates.py` over the same inputs Garmin lists:
 
 - **Readiness:** sleep score, 3-night sleep, HRV against its baseline, load ratio and 3-day
   stress. Recovery time is not used, because it is not available.
@@ -130,10 +130,10 @@ Without zones from the watch (e.g. Strava only), the bot falls back in this orde
 
 ## Adding a data source
 
-1. `collector/sources/<name>.py`: subclass `Source`, set `name` and `required_env`, implement
+1. `secondwind/apps/collector/sources/<name>.py`: subclass `Source`, set `name` and `required_env`, implement
    `fetch(start, end, known_ids) -> Batch` returning rows for `activities` / `health_daily`
    (see `sources/base.py`).
-2. Register it in `collector/sources/__init__.py`.
+2. Register it in `secondwind/apps/collector/sources/__init__.py`.
 3. Terraform: add its secrets to `local.source_secrets` (`terraform/main.tf`) and the name to the
    `data_sources` validation.
 4. `scripts/setup.py`: add it to `SOURCES` and its secrets to `SECRET_HELP`.

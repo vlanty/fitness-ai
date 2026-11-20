@@ -1,15 +1,9 @@
 from datetime import date, timedelta
 
-import importlib.util
-from pathlib import Path
-
-_spec = importlib.util.spec_from_file_location(
-    "collector_main", Path(__file__).resolve().parent.parent / "collector" / "main.py")
-collector = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(collector)
-from bq_writer import dedupe, merge_sql
-from sources import REGISTRY
-from sources.base import Batch, PartialFetch, Source
+from secondwind.apps.collector import main as collector
+from secondwind.adapters.warehouse.bigquery_writer import dedupe, merge_sql
+from secondwind.apps.collector.sources import REGISTRY
+from secondwind.apps.collector.sources.base import Batch, PartialFetch, Source
 
 
 def test_merge_sql_composite_key_and_coalesce():

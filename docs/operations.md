@@ -5,14 +5,15 @@
 - [Updating](#updating)
 - [Rotating keys and tokens](#rotating-keys-and-tokens)
 - [Troubleshooting](#troubleshooting)
+- [Running the tests](#running-the-tests)
 
 The commands below assume `REGION` and `BASE` are set as in [Setup](setup.md#install), step 4.
 
 ## Updating
 
 ```bash
-docker build --platform linux/amd64 -t ${BASE}/collector:latest ./collector && docker push ${BASE}/collector:latest
-docker build --platform linux/amd64 -t ${BASE}/bot:latest ./bot && docker push ${BASE}/bot:latest
+docker build --platform linux/amd64 -f secondwind/apps/collector/Dockerfile -t ${BASE}/collector:latest . && docker push ${BASE}/collector:latest
+docker build --platform linux/amd64 -f secondwind/apps/bot/Dockerfile -t ${BASE}/bot:latest . && docker push ${BASE}/bot:latest
 gcloud run jobs update fitness-collector --region ${REGION} --image ${BASE}/collector:latest
 gcloud run services update fitness-bot --region ${REGION} --image ${BASE}/bot:latest
 ```
@@ -93,5 +94,17 @@ gcloud run services update fitness-bot --region ${REGION} --revision-suffix chat
 ```
 
 **Secrets in logs.** The bot never writes the Telegram token or the Anthropic key to the logs:
-request URLs are not logged, and `bot/log_safety.py` masks anything token-shaped in every log
+request URLs are not logged, and `secondwind/apps/bot/log_safety.py` masks anything token-shaped in every log
 line and traceback.
+
+## Running the tests
+
+Python 3.12, from the repository root:
+
+```bash
+python3.12 -m venv .venv
+.venv/bin/pip install -r requirements/dev.txt
+.venv/bin/python -m pytest -q
+```
+
+The same tests run on GitHub for every pull request (`.github/workflows/tests.yml`).

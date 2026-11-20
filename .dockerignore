@@ -1,0 +1,7 @@
+# Build context is the repository root; send only what the images need.
+*
+!requirements/
+!secondwind/
+**/__pycache__
+**/*.pyc
+**/.DS_Store
