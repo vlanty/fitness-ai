@@ -30,7 +30,7 @@ BigQuery dataset "fitness"
           training_load_daily           (acute/chronic load, ratio, focus, VO2 max trend)
         │
         ▼
-Cloud Run Service "bot" (Telegram webhook, owner chat only)
+Cloud Run Service "bot" (Telegram webhook with secret token, owner chat only)
         ├── secondwind/core/estimates.py ── readiness & training status (our estimates)
         ├── secondwind/core/locales/     ── texts in ru / en
         ├── secondwind/core/models.py    ── which model tier does which task

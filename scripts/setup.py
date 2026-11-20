@@ -16,6 +16,7 @@ import argparse
 import getpass
 import json
 import re
+import secrets
 import subprocess
 import sys
 import urllib.parse
@@ -32,8 +33,12 @@ SOURCES = {
     "strava": "Strava — OAuth-приложение и refresh-токен",
 }
 
+# Secrets the script creates itself (random), instead of asking for a value.
+GENERATED = {"telegram_webhook_secret"}
+
 # Where to get each secret value.
 SECRET_HELP = {
+    "telegram_webhook_secret": "Создаётся автоматически: Telegram присылает его боту в каждом запросе.",
     "telegram_bot_token": "Telegram → @BotFather → /newbot → токен бота.",
     "telegram_chat_id": "Напишите боту любое сообщение, затем откройте "
                         "https://api.telegram.org/bot<TOKEN>/getUpdates и возьмите chat.id. "
@@ -147,6 +152,11 @@ def cmd_secrets(args) -> None:
             print(f"✔ {name}: значение уже задано (обновить: --update {name})")
             continue
         print(f"\n{name}: {SECRET_HELP.get(name, '')}")
+        if name in GENERATED:
+            run(["gcloud", "secrets", "versions", "add", name, "--project", project, "--data-file=-"],
+                input_text=secrets.token_urlsafe(32))
+            print(f"  ✔ {name}: сгенерирован и сохранён (значение не показывается)")
+            continue
         value = getpass.getpass("  значение (ввод скрыт, пусто — пропустить): ").strip()
         if not value:
             print("  пропущено")
@@ -161,7 +171,10 @@ def cmd_webhook(_args) -> None:
     bot_url = tf_output("bot_url")
     token = run(["gcloud", "secrets", "versions", "access", "latest", "--secret", "telegram_bot_token",
                  "--project", project])
-    url = f"https://api.telegram.org/bot{token}/setWebhook?" + urllib.parse.urlencode({"url": f"{bot_url}/webhook"})
+    webhook_secret = run(["gcloud", "secrets", "versions", "access", "latest", "--secret", "telegram_webhook_secret",
+                          "--project", project])
+    url = f"https://api.telegram.org/bot{token}/setWebhook?" + urllib.parse.urlencode(
+        {"url": f"{bot_url}/webhook", "secret_token": webhook_secret})
     with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310 - fixed Telegram host
         body = json.loads(resp.read())
     print("✔ webhook настроен" if body.get("ok") else f"Telegram ответил: {body.get('description')}")
