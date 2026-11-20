@@ -388,7 +388,7 @@ async def _stored(update: Update, lang: str, action) -> bool:
 def _athlete_inputs(update: Update) -> dict:
     """Watch zones, threshold trend and Garmin resting HR; {} if BigQuery can't answer."""
     try:
-        return _bq(update).get_athlete_inputs(update)
+        return _bq(update).get_athlete_inputs()
     except Exception as e:  # noqa: BLE001
         logger.error("athlete inputs read failed: %s", e)
         return {}
