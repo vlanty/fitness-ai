@@ -2,20 +2,20 @@
 gcp_project_id = ""
 gcp_region     = "europe-west3"
 
-# Расписание синхронизации (cron, UTC)
+# Sync schedule (cron, UTC)
 sync_schedule = "0 1 * * *"
 
-# Внутренний id владельца: по нему хранятся все данные и состояние бота.
-# setup.py config создаёт его сам (UUID). Не меняйте на работающей установке.
+# Internal owner id: all data and the bot state are stored under it.
+# `setup.py config` creates it (a UUID). Never change it on a running install.
 owner_user_id = ""
 
-# Необязательно: язык меню и команд бота (ru, en). Пусто — язык из настроек Telegram.
-# Свободные вопросы бот всегда отвечает на языке вопроса.
+# Optional: language of the bot's menus and commands (ru, en). Empty = the Telegram app language.
+# Free-form questions are always answered in the language they were asked in.
 # bot_language = "ru"
 
-# Необязательно: другая модель Claude для задачи бота (chat, analysis, weekly, alerts, morning).
-# По умолчанию: chat/analysis — claude-sonnet-5-5, остальное — claude-haiku-5-5.
+# Optional: another Claude model for a bot task (chat, analysis, weekly, alerts, morning).
+# Defaults: chat/analysis = claude-sonnet-5-5, the rest = claude-haiku-5-5.
 # bot_models = { chat = "claude-opus-5-5" }
 
-# Значения секретов (Telegram, Anthropic, ключи источников данных) здесь
-# больше не хранятся — они задаются прямо в Secret Manager.
+# Secret values (Telegram, Anthropic, data-source keys) are not kept here:
+# they live only in Secret Manager (scripts/setup.py secrets).

@@ -52,7 +52,7 @@ class Source:
     def __init__(self, env: dict[str, str]) -> None:
         missing = [k for k in self.required_env if not env.get(k)]
         if missing:
-            raise RuntimeError(f"{self.name}: не заданы переменные {', '.join(missing)}")
+            raise RuntimeError(f"{self.name}: missing variables {', '.join(missing)}")
         self.env = env
 
     def fetch(self, start: date, end: date, known_activity_ids: set[str]) -> Batch:

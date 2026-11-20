@@ -126,7 +126,7 @@ resource "google_cloud_run_v2_service" "bot" {
   }
 }
 
-# Разрешаем Telegram слать webhook без авторизации
+# Telegram calls the webhook without Google auth; the bot checks Telegram's secret token instead
 resource "google_cloud_run_service_iam_member" "bot_public" {
   location = var.region
   service  = google_cloud_run_v2_service.bot.name

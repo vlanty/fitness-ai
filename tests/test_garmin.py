@@ -137,7 +137,7 @@ def test_client_gives_up_after_max_attempts():
 
 def test_rejected_key_is_reported_clearly():
     c = client({"/token": lambda m, u, k: Resp(401)})
-    with pytest.raises(GarminApiError, match="ключ"):
+    with pytest.raises(GarminApiError, match="API key"):
         c.get_json("/x")
 
 
