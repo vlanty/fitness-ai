@@ -2,8 +2,9 @@
 
 [← Back to README](../README.md)
 
-Second Wind runs in your own Google Cloud project. Once it is installed, the
-collector and the bot run on their own. For updates and fixes later, see [Operations](operations.md).
+Second Wind runs in your own **Google Cloud** project. Other clouds, AI models and an
+on-premises version are planned (see [README](../README.md#where-it-runs)). Once it is installed,
+the collector and the bot run on their own. For updates and fixes later, see [Operations](operations.md).
 
 - [Prerequisites](#prerequisites)
 - [Install](#install)
