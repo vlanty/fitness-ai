@@ -35,6 +35,7 @@ metrics:
   - {code: energy.active,        value_type: num, unit: kcal, value_kind: absolute, group: movement, comparable: within_family, daily_column: active_calories, column_type: INT64}
   # ── fitness ──
   - {code: fitness.vo2max,       value_type: num, unit: mL/kg/min, value_kind: absolute, group: vo2max, comparable: within_method, description: "attrs.sport: run | bike | generic", daily_column: vo2max, column_type: FLOAT64, workout_column: vo2max}
+  - {code: fitness.vo2max_bike,   value_type: num, unit: mL/kg/min, value_kind: absolute, group: vo2max_bike, comparable: within_method, description: "Cycling VO2 max estimate"}
   # ── workout summary (context: workout, session_id set) ──
   - {code: workout.distance,         value_type: num, unit: m,    value_kind: absolute, group: workout, comparable: within_family, workout_column: distance_meters, column_type: FLOAT64}
   - {code: workout.duration.moving,  value_type: num, unit: s,    value_kind: absolute, group: workout, comparable: within_method, workout_column: duration_seconds, column_type: INT64}

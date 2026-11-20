@@ -15,6 +15,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from datetime import date
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from secondwind.core.observations import ModelBatch
 
 
 @dataclass
@@ -61,6 +65,11 @@ class Source:
         known_activity_ids: ids already stored, so sources can skip expensive
         per-activity downloads (e.g. .FIT files) for them.
         """
+        raise NotImplementedError
+
+    def to_model(self, user_id: str, batch: Batch, store) -> "ModelBatch":
+        """Turn a fetched batch into the universal model (observations, sessions, zones, streams),
+        storing the raw payloads in `store` and pointing rows at them."""
         raise NotImplementedError
 
 

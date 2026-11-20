@@ -13,6 +13,7 @@ methods:
   - {code: vendor_daily_total,     metrics: [activity.steps, energy.active], statistic: sum, window: "calendar day", family: daily_total, evidence: documented}
   - {code: vendor_daily_mean,      metrics: [resp.rate, spo2.mean], statistic: mean, window: "calendar day (vendor-defined)", family: daily_mean, evidence: unknown}
   - {code: wearable_run_hr_pace,   metrics: [fitness.vo2max], statistic: "model estimate", window: "recent runs", family: vo2max_wearable, evidence: documented, description: "Firstbeat/Garmin and similar HR+pace models"}
+  - {code: wearable_bike_hr_power, metrics: [fitness.vo2max_bike], statistic: "model estimate", window: "recent rides with power", family: vo2max_wearable, evidence: documented}
   - {code: session_summary,        metrics: ["workout.*"], statistic: "vendor session summary", window: session, family: session_summary, evidence: documented, description: "distance, durations, HR, pace, energy as reported for the session"}
   - {code: garmin_epoc_load,       metrics: [workout.load], statistic: "EPOC-based load (Firstbeat)", window: session, family: garmin_epoc_load, evidence: documented}
   - {code: garmin_fastest_split,   metrics: [workout.best_effort_time], statistic: "fastest split", window: session, family: best_effort_vendor, evidence: inferred, description: "raw_json fastestSplit_<meters>"}
