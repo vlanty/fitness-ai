@@ -14,7 +14,7 @@ from secondwind.core.assistant import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, N
 from secondwind.core.freshness import stale_warnings
 from secondwind.core.ports import LLM, DataReader, StateStore
 from secondwind.core import analytics
-from secondwind.apps.bot import charts
+from secondwind.apps.bot import charts, tenancy
 from secondwind.core.athlete import DISTANCES, PROFILE_FIELDS, athlete_note, compute_zones
 from secondwind.core.estimates import readiness, training_status
 from secondwind.core.i18n import SUPPORTED, resolve, t
@@ -46,14 +46,14 @@ def _enabled_sources():
 
 
 def _owner() -> str:
-    return os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    return tenancy.owner_chat()
 
 
 def _allowed(update: Update) -> bool:
-    """Only the owner's chat may use the bot (it exposes health data and spends Claude credits)."""
-    owner = _owner()
+    """Only chats that map to a user may use the bot (it exposes health data and spends AI credits).
+    In solo mode that is the owner's chat, and only once OWNER_USER_ID is set."""
     chat = update.effective_chat
-    return bool(owner) and chat is not None and str(chat.id) == owner
+    return tenancy.user_for_chat(chat.id if chat is not None else None) is not None
 
 
 @lru_cache(maxsize=1)
@@ -66,14 +66,18 @@ def _llm() -> LLM:
     return ClaudeLLM()
 
 
-def _chat_id(update: Update) -> int:
-    return update.effective_chat.id
+def _uid(update: Update) -> str:
+    """The internal user_id of this chat (callers have passed _guard)."""
+    return tenancy.user_for_chat(update.effective_chat.id)
 
 
 def _user(update: Update) -> dict:
     """The user's stored state; {} if storage is unavailable (the bot keeps working without it)."""
+    uid = _uid(update) if update.effective_chat is not None else None
+    if uid is None:
+        return {}
     try:
-        return _store().get_user(_chat_id(update))
+        return _store().get_user(uid)
     except Exception as e:  # noqa: BLE001
         logger.error("state read failed: %s", e)
         return {}
@@ -240,7 +244,8 @@ async def setup_menu(bot) -> None:
     scope = BotCommandScopeChat(int(owner))
     # A language fixed in /settings or by BOT_LANGUAGE applies whatever the Telegram app language is.
     try:
-        chosen = (_store().get_user(int(owner)).get("settings") or {}).get("lang")
+        uid = tenancy.owner_user_id()
+        chosen = (_store().get_user(uid).get("settings") or {}).get("lang") if uid else None
     except Exception as e:  # noqa: BLE001
         logger.error("state read failed: %s", e)
         chosen = None
@@ -398,7 +403,7 @@ async def cmd_settings(update: Update, ctx: ContextTypes.DEFAULT_TYPE, edit: boo
     user = _user(update)
     lang = _lang(update, user)
     try:
-        usage = _store().get_usage(_chat_id(update), _month())
+        usage = _store().get_usage(_uid(update), _month())
     except Exception as e:  # noqa: BLE001
         logger.error("usage read failed: %s", e)
         usage = {}
@@ -407,7 +412,7 @@ async def cmd_settings(update: Update, ctx: ContextTypes.DEFAULT_TYPE, edit: boo
 
 async def _on_setting(update: Update, key: str, value: str):
     lang = _lang(update)
-    ok = await _stored(update, lang, lambda: apply_setting(_store(), _chat_id(update), key, value))
+    ok = await _stored(update, lang, lambda: apply_setting(_store(), _uid(update), key, value))
     if ok:
         if key == "lang":
             await setup_menu(update.get_bot())
@@ -426,12 +431,12 @@ async def _on_profile_button(update: Update, rest: str):
     lang = _lang(update)
     action, _, field = rest.partition(":")
     if action == "clear":
-        if await _stored(update, lang, lambda: _store().clear_profile(_chat_id(update))):
+        if await _stored(update, lang, lambda: _store().clear_profile(_uid(update))):
             await _reply(update, t(lang, "prof.cleared"))
             await cmd_profile(update, None)
     elif action == "edit" and field in PROFILE_FIELDS:
         pending = {"kind": "profile", "field": field}
-        if await _stored(update, lang, lambda: _store().set_pending(_chat_id(update), pending)):
+        if await _stored(update, lang, lambda: _store().set_pending(_uid(update), pending)):
             await _reply(update, ask_text(lang, pending))
 
 
@@ -440,7 +445,7 @@ async def cmd_goal(update: Update, ctx: ContextTypes.DEFAULT_TYPE, edit: bool = 
         return
     lang = _lang(update)
     try:
-        goal = _store().get_goal(_chat_id(update))
+        goal = _store().get_goal(_uid(update))
     except Exception as e:  # noqa: BLE001
         logger.error("goal read failed: %s", e)
         goal = None
@@ -450,17 +455,17 @@ async def cmd_goal(update: Update, ctx: ContextTypes.DEFAULT_TYPE, edit: bool = 
 async def _on_goal_button(update: Update, rest: str):
     lang = _lang(update)
     action, _, value = rest.partition(":")
-    chat = _chat_id(update)
+    uid = _uid(update)
     if action == "new":
         await _reply(update, t(lang, "goal.ask.distance"), reply_markup=distance_keyboard(lang))
     elif action == "delete":
-        if await _stored(update, lang, lambda: _store().delete_goal(chat)):
+        if await _stored(update, lang, lambda: _store().delete_goal(uid)):
             await _reply(update, t(lang, "goal.deleted"))
     elif action == "dist":
         km = DISTANCES.get(value)
         pending = ({"kind": "goal", "step": "date", "data": {"distance_km": km}} if km
                    else {"kind": "goal", "step": "distance_other", "data": {}})
-        if await _stored(update, lang, lambda: _store().set_pending(chat, pending)):
+        if await _stored(update, lang, lambda: _store().set_pending(uid, pending)):
             await _reply(update, ask_text(lang, pending))
 
 
@@ -472,7 +477,7 @@ async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not user.get("pending"):
         await _reply(update, t(lang, "nothing_to_cancel"))
         return
-    if await _stored(update, lang, lambda: _store().set_pending(_chat_id(update), None)):
+    if await _stored(update, lang, lambda: _store().set_pending(_uid(update), None)):
         await _reply(update, t(lang, "cancelled"))
 
 
@@ -543,7 +548,7 @@ async def _send_ai_text(update: Update, markdown: str):
 
 def _record_usage(update: Update, answer) -> None:
     try:
-        _store().add_usage(_chat_id(update), _month(), answer.input_tokens, answer.output_tokens, answer.cost_usd)
+        _store().add_usage(_uid(update), _month(), answer.input_tokens, answer.output_tokens, answer.cost_usd)
     except Exception as e:  # noqa: BLE001 - spending stats must never block the answer
         logger.error("usage write failed: %s", e)
 
@@ -553,7 +558,7 @@ async def _ai_reply(update: Update, prompt: str, label: str, task: str, **fmt):
     lang = _lang(update, user)
     mode = (user.get("settings") or {}).get("mode", DEFAULT_MODE)
     try:
-        goal = _store().get_goal(_chat_id(update))
+        goal = _store().get_goal(_uid(update))
     except Exception as e:  # noqa: BLE001
         logger.error("goal read failed: %s", e)
         goal = None
@@ -605,7 +610,7 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lang = _lang(update, user)
         try:
             watch = _athlete_inputs() if pending.get("kind") == "profile" else None
-            text, kb = handle_input(_store(), _chat_id(update), lang, pending, update.message.text, date.today(),
+            text, kb = handle_input(_store(), _uid(update), lang, pending, update.message.text, date.today(),
                                     watch)
         except Exception as e:  # noqa: BLE001
             logger.error("input handling failed: %s", e)
@@ -621,7 +626,7 @@ def _clears_pending(handler):
     async def wrapped(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if _allowed(update) and _user(update).get("pending"):
             try:
-                _store().set_pending(_chat_id(update), None)
+                _store().set_pending(_uid(update), None)
             except Exception as e:  # noqa: BLE001
                 logger.error("state write failed: %s", e)
         await handler(update, ctx)
