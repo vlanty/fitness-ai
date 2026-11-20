@@ -57,7 +57,7 @@ class GarminClient:
     def _refresh_token(self) -> None:
         r = self._send("POST", TOKEN_PATH, headers={"Accept": "*/*", "Authorization": "ApiKey " + self._key})
         if r.status_code in (401, 403):
-            raise GarminApiError("Garmin отклонил ключ (HTTP %d): истёк или удалён — выпустите новый" % r.status_code)
+            raise GarminApiError("Garmin rejected the API key (HTTP %d): it expired or was deleted; create a new one" % r.status_code)
         if not r.ok:
             raise GarminApiError(f"token: HTTP {r.status_code}")
         self._token = r.text.strip()
@@ -85,9 +85,9 @@ class GarminClient:
             if r is not None and r.headers.get("Retry-After", "").isdigit():
                 delay = max(delay, float(r.headers["Retry-After"]))
             self.retries += 1
-            logger.warning("garmin: %s %s -> %s, повтор через %.0f с", method, path.split("?")[0], err, delay)
+            logger.warning("garmin: %s %s -> %s, retry in %.0f s", method, path.split("?")[0], err, delay)
             self._sleep(delay)
-        raise GarminApiError(f"{method} {path.split('?')[0]}: {err} после {MAX_ATTEMPTS} попыток")
+        raise GarminApiError(f"{method} {path.split('?')[0]}: {err} after {MAX_ATTEMPTS} attempts")
 
     def get(self, path: str, params: dict | None = None, accept: str = "application/json") -> requests.Response:
         if self._token is None:
@@ -301,7 +301,7 @@ class GarminSource(Source):
             if act["activity_id"] in known_activity_ids:
                 continue
             if len(files) >= self.fit_limit:
-                logger.info("garmin: лимит загрузки .FIT за прогон (%d) — остальные в следующий раз", self.fit_limit)
+                logger.info("garmin: .FIT download limit per run (%d) reached; the rest next time", self.fit_limit)
                 break
             r = self.client.get(f"/download-service/files/activity/{act['activity_id']}",
                                 accept="application/zip, application/x-zip-compressed, application/octet-stream")
@@ -311,9 +311,9 @@ class GarminSource(Source):
                 act["raw_file"] = path
                 act.update(extract_zones(r.content))  # the watch's HR zones, empty if the file has none
             else:
-                logger.warning("garmin: файл активности %s: HTTP %d", act["activity_id"], r.status_code)
+                logger.warning("garmin: activity file %s: HTTP %d", act["activity_id"], r.status_code)
         health = self._health(start, end)
-        logger.info("garmin %s…%s: активностей %d, файлов %d, дней здоровья %d (запросов %d, повторов %d)",
+        logger.info("garmin %s…%s: %d activities, %d files, %d health days (%d requests, %d retries)",
                     start, end, len(acts), len(files), len(health), self.client.calls, self.client.retries)
         if self.partial_errors:
             raise PartialFetch(Batch(acts, health, files), self.partial_errors)

@@ -29,7 +29,7 @@ TF_DIR = ROOT / "terraform"
 TFVARS = TF_DIR / "terraform.tfvars"
 
 SOURCES = {
-    "garmin": "Garmin Connect — официальный Personal API (личный ключ)",
+    "garmin": "Garmin Connect: official Personal API (personal key)",
 }
 
 # Secrets the script creates itself (random), instead of asking for a value.
@@ -37,21 +37,21 @@ GENERATED = {"telegram_webhook_secret"}
 
 # Where to get each secret value.
 SECRET_HELP = {
-    "telegram_webhook_secret": "Создаётся автоматически: Telegram присылает его боту в каждом запросе.",
-    "telegram_bot_token": "Telegram → @BotFather → /newbot → токен бота.",
-    "telegram_chat_id": "Напишите боту любое сообщение, затем откройте "
-                        "https://api.telegram.org/bot<TOKEN>/getUpdates и возьмите chat.id. "
-                        "Бот отвечает только этому чату.",
+    "telegram_webhook_secret": "Generated automatically: Telegram sends it to the bot with every request.",
+    "telegram_bot_token": "Telegram → @BotFather → /newbot → the bot token.",
+    "telegram_chat_id": "Send the bot any message, then open "
+                        "https://api.telegram.org/bot<TOKEN>/getUpdates and take chat.id. "
+                        "The bot answers only this chat.",
     "anthropic_api_key": "console.anthropic.com → API Keys.",
     "garmin_personal_api_key": "connect.garmin.com/app/settings/personalApiToken → Create Key. "
-                               "Ключ показывается один раз; срок 30/90/180 дней или 1 год.",
+                               "The key is shown once; valid for 30/90/180 days or 1 year.",
 }
 
 
 def run(cmd: list[str], *, input_text: str | None = None, check: bool = True, capture: bool = True) -> str:
     res = subprocess.run(cmd, input=input_text, text=True, capture_output=capture)
     if check and res.returncode != 0:
-        sys.exit(f"Команда завершилась с ошибкой: {' '.join(cmd[:4])} …\n{res.stderr.strip()}")
+        sys.exit(f"Command failed: {' '.join(cmd[:4])} …\n{res.stderr.strip()}")
     return (res.stdout or "").strip()
 
 
@@ -63,29 +63,29 @@ def ask(prompt: str, default: str | None = None) -> str:
 
 # ── config ────────────────────────────────────────────────────────────────────
 def cmd_config(_args) -> None:
-    project = ask("ID проекта GCP", run(["gcloud", "config", "get-value", "project"], check=False) or None)
-    region = ask("Регион", "europe-west3")
+    project = ask("GCP project ID", run(["gcloud", "config", "get-value", "project"], check=False) or None)
+    region = ask("Region", "europe-west3")
 
-    print("\nИсточники данных:")
+    print("\nData sources:")
     names = list(SOURCES)
     for i, n in enumerate(names, 1):
         print(f"  {i}. {n:<7} {SOURCES[n]}")
-    print("Перечислите номера через запятую в порядке приоритета (первый — главный при дублях).")
+    print("List the numbers, comma-separated, in priority order (the first wins on duplicates).")
     while True:
-        picked = [p.strip() for p in ask("Источники", "1").split(",") if p.strip()]
+        picked = [p.strip() for p in ask("Sources", "1").split(",") if p.strip()]
         try:
             chosen = [names[int(p) - 1] for p in picked]
         except (ValueError, IndexError):
-            print("Нужны номера из списка.")
+            print("Use numbers from the list.")
             continue
         if chosen and len(set(chosen)) == len(chosen):
             break
-        print("Выберите хотя бы один источник без повторов.")
+        print("Pick at least one source, without repeats.")
 
-    schedule = ask("Расписание сборщика (cron, UTC)", "15 */4 * * *")
+    schedule = ask("Collector schedule (cron, UTC)", "15 */4 * * *")
 
-    if TFVARS.exists() and ask(f"{TFVARS.name} уже есть. Перезаписать? (y/N)", "N").lower() != "y":
-        sys.exit("Оставил как есть.")
+    if TFVARS.exists() and ask(f"{TFVARS.name} already exists. Overwrite? (y/N)", "N").lower() != "y":
+        sys.exit("Left as is.")
     # The owner's id keys all data and the bot state: keep it if the install already has one.
     old = re.search(r'^owner_user_id\s*=\s*"([^"]+)"', TFVARS.read_text(encoding="utf-8"), re.M) if TFVARS.exists() else None
     owner_user_id = old.group(1) if old else str(uuid.uuid4())
@@ -95,29 +95,29 @@ def cmd_config(_args) -> None:
         f'gcp_region     = "{region}"\n'
         f'data_sources   = [{sources_hcl}]\n'
         f'sync_schedule  = "{schedule}"\n'
-        f'owner_user_id  = "{owner_user_id}" # не меняйте: по нему хранятся все данные\n'
-        "# retired_secrets = [] # секреты, которые больше не нужны: остаются, помечаются status=retired\n",
+        f'owner_user_id  = "{owner_user_id}" # never change: all data is stored under it\n'
+        "# retired_secrets = [] # secrets no longer needed: kept and labelled status=retired\n",
         encoding="utf-8")
-    print(f"\n✔ Записан {TFVARS.relative_to(ROOT)} (в .gitignore)")
+    print(f"\n✔ Wrote {TFVARS.relative_to(ROOT)} (git-ignored)")
 
     bucket = f"{project}-tfstate"
     exists = subprocess.run(["gcloud", "storage", "buckets", "describe", f"gs://{bucket}", "--project", project],
                             capture_output=True).returncode == 0
     if exists:
-        print(f"✔ Бакет для state уже есть: gs://{bucket}")
-    elif ask(f"Создать бакет для Terraform state gs://{bucket}? (Y/n)", "Y").lower() == "y":
+        print(f"✔ State bucket already exists: gs://{bucket}")
+    elif ask(f"Create the Terraform state bucket gs://{bucket}? (Y/n)", "Y").lower() == "y":
         run(["gcloud", "storage", "buckets", "create", f"gs://{bucket}", "--project", project,
              "--location", region, "--uniform-bucket-level-access", "--public-access-prevention"])
         run(["gcloud", "storage", "buckets", "update", f"gs://{bucket}", "--versioning"])
-        print(f"✔ Создан gs://{bucket} (с версионированием)")
+        print(f"✔ Created gs://{bucket} (versioned)")
 
     print(f"""
-Дальше:
+Next:
   cd terraform
   terraform init -backend-config="bucket={bucket}"
   terraform apply -target=google_project_service.apis -target=google_artifact_registry_repository.repo -target=module.secrets
   python3 ../scripts/setup.py secrets
-  # соберите и загрузите образы (docs/setup.md, шаг 4), затем:
+  # build and push the images (docs/setup.md, step 4), then:
   terraform apply
   python3 ../scripts/setup.py webhook""")
 
@@ -130,7 +130,7 @@ def tf_output(name: str):
 def project_id() -> str:
     m = re.search(r'gcp_project_id\s*=\s*"([^"]+)"', TFVARS.read_text(encoding="utf-8")) if TFVARS.exists() else None
     if not m:
-        sys.exit("Нет terraform/terraform.tfvars — сначала: python3 scripts/setup.py config")
+        sys.exit("No terraform/terraform.tfvars yet; run first: python3 scripts/setup.py config")
     return m.group(1)
 
 
@@ -145,20 +145,20 @@ def cmd_secrets(args) -> None:
     names = tf_output("secrets_to_fill")
     for name in names:
         if has_value(name, project) and name not in args.update:
-            print(f"✔ {name}: значение уже задано (обновить: --update {name})")
+            print(f"✔ {name}: already has a value (to replace it: --update {name})")
             continue
         print(f"\n{name}: {SECRET_HELP.get(name, '')}")
         if name in GENERATED:
             run(["gcloud", "secrets", "versions", "add", name, "--project", project, "--data-file=-"],
                 input_text=secrets.token_urlsafe(32))
-            print(f"  ✔ {name}: сгенерирован и сохранён (значение не показывается)")
+            print(f"  ✔ {name}: generated and stored (the value is not shown)")
             continue
-        value = getpass.getpass("  значение (ввод скрыт, пусто — пропустить): ").strip()
+        value = getpass.getpass("  value (hidden; empty = skip): ").strip()
         if not value:
-            print("  пропущено")
+            print("  skipped")
             continue
         run(["gcloud", "secrets", "versions", "add", name, "--project", project, "--data-file=-"], input_text=value)
-        print(f"  ✔ {name}: новая версия добавлена")
+        print(f"  ✔ {name}: new version added")
 
 
 # ── webhook ───────────────────────────────────────────────────────────────────
@@ -173,17 +173,17 @@ def cmd_webhook(_args) -> None:
         {"url": f"{bot_url}/webhook", "secret_token": webhook_secret})
     with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310 - fixed Telegram host
         body = json.loads(resp.read())
-    print("✔ webhook настроен" if body.get("ok") else f"Telegram ответил: {body.get('description')}")
+    print("✔ webhook set" if body.get("ok") else f"Telegram answered: {body.get('description')}")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("config", help="проект, регион, источники данных").set_defaults(fn=cmd_config)
-    p = sub.add_parser("secrets", help="заполнить значения секретов")
-    p.add_argument("--update", nargs="*", default=[], help="перезаписать эти секреты (например, при новом ключе)")
+    sub.add_parser("config", help="project, region, data sources").set_defaults(fn=cmd_config)
+    p = sub.add_parser("secrets", help="fill in secret values")
+    p.add_argument("--update", nargs="*", default=[], help="replace these secrets (for example, after a new key)")
     p.set_defaults(fn=cmd_secrets)
-    sub.add_parser("webhook", help="настроить webhook Telegram").set_defaults(fn=cmd_webhook)
+    sub.add_parser("webhook", help="set the Telegram webhook").set_defaults(fn=cmd_webhook)
     args = ap.parse_args()
     args.fn(args)
 
