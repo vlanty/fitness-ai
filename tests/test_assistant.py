@@ -62,3 +62,12 @@ def test_haiku_has_no_fallback_and_refusal_raises():
     with pytest.raises(a.Refused):
         a.analyze(ClaudeLLM(client=client), a.COACH_PROMPT, "DATA", "analysis", "en", mode="economy")
     assert client.calls[0]["model"] == H and "fallbacks" not in client.calls[0]
+
+
+def test_prompt_files_use_only_known_fields():
+    import string
+    allowed = {"persona", "goal", "data", "format", "language", "question"}
+    for name in ("coach", "health", "nutrition", "ask"):
+        fields = {f for _, f, _, _ in string.Formatter().parse(a._prompt(name)) if f}
+        assert fields <= allowed and {"persona", "data", "format", "language"} <= fields, name
+    assert "Vita" in a.PERSONA and not a.PERSONA.endswith("\n")
