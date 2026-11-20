@@ -7,10 +7,10 @@ NOW = datetime(2026, 11, 17, 12, tzinfo=timezone.utc)
 
 def test_stale_warnings():
     rows = [{"source": "garmin", "last_success_at": NOW - timedelta(hours=2), "last_status": "ok"},
-            {"source": "strava", "last_success_at": NOW - timedelta(days=3), "last_status": "failed"}]
+            {"source": "polar", "last_success_at": NOW - timedelta(days=3), "last_status": "failed"}]
     assert stale_warnings(rows, ["garmin"], "ru", NOW) == []
-    w = stale_warnings(rows, ["garmin", "strava", "polar"], "ru", NOW)
-    assert len(w) == 2 and "strava" in w[0] and "(failed)" in w[0] and "ни разу" in w[1]
+    w = stale_warnings(rows, ["garmin", "polar", "coros"], "ru", NOW)
+    assert len(w) == 2 and "polar" in w[0] and "(failed)" in w[0] and "ни разу" in w[1]
 
 
 def test_format_activity_escapes_markdown_and_shows_source():
