@@ -57,6 +57,9 @@ class MemoryStore:
     def get_usage(self, user_id, month):
         return dict(self.usage.get((user_id, month), {}))
 
+    def update_guard(self, user_id, guard):
+        self._user(user_id)["guard"] = copy.deepcopy(guard)
+
     def get_identity(self, key):
         return self.identities.get(key)
 

@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from functools import lru_cache
 
 from telegram import BotCommand, BotCommandScopeChat, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Update
@@ -12,6 +12,7 @@ from secondwind.adapters.llm.claude import ClaudeLLM
 from secondwind.adapters.warehouse.bigquery_reader import BigQueryReader
 from secondwind.core.assistant import ASK_PROMPT, COACH_PROMPT, HEALTH_PROMPT, NUTRITION_PROMPT, Refused, analyze
 from secondwind.core.freshness import stale_warnings
+from secondwind.core.guard import is_repeat, model_allowed, record_message, record_model_call
 from secondwind.core.router import Route, route as route_message
 from secondwind.core.ports import LLM, DataReader, StateStore
 from secondwind.core import analytics
@@ -29,6 +30,8 @@ from secondwind.apps.bot.user_ui import _zones_title
 logger = logging.getLogger(__name__)
 
 SOURCE_LABEL = {"garmin": "Garmin", "strava": "Strava"}
+# Questions a user may send to the AI model per hour (filter, architecture 2.1).
+MODEL_CALLS_PER_HOUR = int(os.environ.get("MODEL_CALLS_PER_HOUR", "20"))
 CONTEXT_LANG = "en"  # data handed to Claude is formatted in English; Claude answers in the user's language
 
 # Commands in the Telegram "Menu" list, in display order. /start stays hidden (Telegram sends it itself).
@@ -621,7 +624,7 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         await _show(update, text, kb)
         return
-    r = route_message(update.message.text, _lang(update, user), date.today())
+    r = _guarded_route(update, user, update.message.text, datetime.now(timezone.utc))
     if r.kind != "model":
         try:
             answer = _fast_answer(update, r, user)
@@ -679,6 +682,39 @@ def _fast_metric(update: Update, lang: str, metric: str, day: date) -> str:
     return t(lang, "fast.metric.missing", date=when)
 
 
+def _guarded_route(update: Update, user: dict, text: str, now: datetime) -> Route:
+    """Rules first, then the per-user guard: repeats and the hourly model-call limit (2.1)."""
+    r = route_message(text, _lang(update, user), now.date())
+    guard = user.get("guard") or {}
+    if r.key != "filter.red_flag" and is_repeat(guard, text, now):
+        r = Route("filter", "filter.repeat", r.lang)
+    elif r.kind == "model" and not model_allowed(guard, now, MODEL_CALLS_PER_HOUR):
+        r = Route("filter", "filter.rate_limited", r.lang)
+    new_guard = record_message(guard, text, now)
+    if r.kind == "model":
+        new_guard = record_model_call(new_guard, now)
+    try:
+        _store().update_guard(_uid(update), new_guard)
+    except Exception as e:  # noqa: BLE001 - the guard must never block an answer
+        logger.error("guard write failed: %s", e)
+    return r
+
+
+RIEGEL = 1.06
+
+
+def _race_prediction(update: Update, lang: str, target_km: float) -> str:
+    """Riegel (T2 = T1 * (D2 / D1) ** 1.06) from the recent best effort closest to the target distance."""
+    rows = [x for x in _bq(update).get_records(date.today() - timedelta(days=365))
+            if x.get("span") == "recent" and x.get("secs") and (x.get("d") or 0) >= 1000]
+    if not rows:
+        return t(lang, "fast.race.no_data")
+    src = min(rows, key=lambda x: (abs(x["d"] / 1000 - target_km), -x["d"]))
+    total = src["secs"] * (target_km / (src["d"] / 1000)) ** RIEGEL
+    return t(lang, "fast.race.result", target=f"{target_km:g}", time=_clock(total), pace=_clock(total / target_km),
+             src=f"{src['d'] / 1000:g}", src_time=_clock(src["secs"]), src_date=_d(src.get("activity_date")))
+
+
 def _fast_answer(update: Update, r: Route, user: dict) -> tuple[str, dict] | None:
     """Text and reply options for messages answered without the model; None = ask the model."""
     lang, p, html = r.lang, r.params, {"parse_mode": "HTML"}
@@ -704,6 +740,8 @@ def _fast_answer(update: Update, r: Route, user: dict) -> tuple[str, dict] | Non
             return t(lang, "prof.zones.need"), html
         lines = [_zones_title(lang, z)] + [f"Z{i + 1}: {a}–{b}" for i, (a, b) in enumerate(z.zones)]
         return "\n".join(lines), html
+    if r.key == "calc.race_predict":
+        return _race_prediction(update, lang, p["distance_km"]), html
     if r.key == "calc.pace":
         km = p["distance_km"]
         km_s = f"{km:g}"

@@ -17,6 +17,7 @@ import yaml
 
 RULES_DIR = Path(__file__).resolve().parent.parent / "contracts" / "rules"
 LANGS = ("ru", "en")
+MAX_CHARS = 1000             # longer messages are not sent to the model (architecture 2.1)
 FLAGS = re.IGNORECASE | re.UNICODE
 
 
@@ -57,6 +58,8 @@ def route(text: str, ui_lang: str = "en", today: date | None = None) -> Route:
     lang = detect_lang(text)
     if not text:
         return Route("filter", "filter.empty", ui_lang)
+    if len(text) > MAX_CHARS:
+        return Route("filter", "filter.too_long", lang or ui_lang)
     if lang is None:
         return Route("filter", "filter.unsupported_language", ui_lang)
     filters, to_model, intents = _rules()
@@ -168,10 +171,24 @@ def _pace_params(text: str) -> dict | None:
     return None
 
 
+def _race_params(text: str) -> dict | None:
+    t = text.lower()
+    for pattern, km in NAMED_DISTANCES:
+        if re.search(pattern, t):
+            return {"distance_km": km}
+    m = re.search(NUM + r"\s*(км|km|k)\b", t)
+    if m:
+        km = float(m.group(1).replace(",", "."))
+        return {"distance_km": km} if 1 <= km <= 100 else None
+    return None
+
+
 def extract(intent: str, text: str, lang: str, today: date) -> dict | None:
     """Parameters for an intent, or None when they cannot be read (then the model answers)."""
     if intent == "calc.pace":
         return _pace_params(text)
+    if intent == "calc.race_predict":
+        return _race_params(text)
     if intent == "fact.run_distance":
         code = _period(text, "week")
         start, end = period_dates(code, today)

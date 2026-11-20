@@ -309,5 +309,11 @@
   "fast.no_data": "No data yet.",
   "fast.pace.result": "⏱ {km} km in {time} = pace <b>{pace}/km</b>",
   "fast.time.result": "⏱ {km} km at {pace}/km = <b>{time}</b>",
-  "fast.zones.title": "Heart-rate zones"
+  "fast.zones.title": "Heart-rate zones",
+  "filter.injection": "I'm Vita and only help with your training, sleep, recovery and nutrition — I don't change my rules 🙂 Ask me about those.",
+  "filter.too_long": "That message is too long. Please ask in under 1000 characters — I'll answer more precisely.",
+  "filter.repeat": "I already got this one — the answer is above 🙂",
+  "filter.rate_limited": "The hourly limit of AI questions is used up. Commands in /menu work as usual; you can ask again in an hour.",
+  "fast.race.result": "🏁 Prediction for {target} km: <b>{time}</b> (pace {pace}/km)\nRiegel formula from your best {src} km in 12 months: {src_time} ({src_date}). An estimate, not a promise: over long distances volume and fuelling decide.",
+  "fast.race.no_data": "A prediction needs your best running efforts from the last 12 months, and there are none yet."
 }

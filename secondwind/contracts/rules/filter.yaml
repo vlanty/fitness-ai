@@ -21,6 +21,19 @@ rules:
       - 'blood in (my )?(urine|stool|sputum)'
       - '(left )?arm (is )?numb'
       - '(irregular|skipping) heart ?beats?|arrhythmia'
+  - key: filter.injection        # attempts to change the bot's instructions or role
+    ru:
+      - '(забудь|игнорируй|проигнорируй|отбрось|отмени|сбрось)\W+(\w+\W+){0,3}(инструкц|указани|правил|промпт|ограничени|настройк)'
+      - '(ты теперь|теперь ты|отныне ты|представь,? что ты|притворись|сыграй роль|веди себя как)'
+      - '(системн\w*|исходн\w*|скрыт\w*) (промпт|инструкц|подсказк)'
+      - '(режим разработчика|джейлбрейк|jailbreak|\bdan\b)'
+      - '(новые|другие) инструкции'
+    en:
+      - '(ignore|forget|disregard|override|bypass)\W+(\w+\W+){0,3}(instructions|rules|prompt|guidelines|restrictions)'
+      - '(you are now|from now on you|pretend (to be|you are)|act as an? |roleplay as|role-play as)'
+      - '(system|hidden|initial) (prompt|instructions)'
+      - '(developer mode|jailbreak|\bdan\b)'
+      - 'new instructions'
   - key: filter.thanks
     ru: ['^\W*(спасибо|благодарю|спс|пасиб\w*)( большое| огромное)?\W*$']
     en: ['^\W*(thanks|thank you|thx|cheers)( a lot| so much)?\W*$']
@@ -32,7 +45,9 @@ rules:
       - '(напиши|сочини) (мне )?(стих|песн|рассказ|сказк|код|программ)'
       - '(расскажи|скажи) (мне )?(анекдот|шутку)'
       - '(курс|прогноз) (доллара|евро|биткоин|акци)'
+      - 'рецепт\w*\W+(\w+\W+){0,2}(шарлотк|торт|пирог|пирож|печень|кекс|маффин|блин|десерт|выпечк)'
     en:
       - '(write|compose) (me )?(a )?(poem|song|story|code|program)'
       - 'tell (me )?a joke'
       - '(price|forecast) of (bitcoin|the dollar|stocks?)'
+      - 'recipe\W+(\w+\W+){0,3}(cake|pie|cookies?|brownies?|muffins?|pancakes?|dessert|pastry)'
