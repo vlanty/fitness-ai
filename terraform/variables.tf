@@ -13,8 +13,8 @@ variable "data_sources" {
   default     = ["garmin"]
 
   validation {
-    condition     = length(var.data_sources) > 0 && alltrue([for s in var.data_sources : contains(["garmin", "strava"], s)])
-    error_message = "data_sources: непустой список из \"garmin\", \"strava\"."
+    condition     = length(var.data_sources) > 0 && alltrue([for s in var.data_sources : contains(["garmin"], s)])
+    error_message = "data_sources: непустой список из \"garmin\"."
   }
 }
 

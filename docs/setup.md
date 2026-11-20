@@ -71,7 +71,6 @@ sources have the same workout or the same day, the one listed first wins
 | Source | Data | Credentials |
 |---|---|---|
 | `garmin` | activities (+ original .FIT), sleep, HRV, stress, Body Battery, resting HR, steps, VO2 max | Personal API key |
-| `strava` | activities only | OAuth app + refresh token |
 
 ### Garmin Connect
 
@@ -87,12 +86,12 @@ own data only, not for serving other users.
 To check what your own account returns, run `python3 scripts/garmin_probe.py` with your key.
 When the key expires, see [Operations → Garmin key](operations.md#garmin-key).
 
-### Strava
+### Why there is no Strava
 
-1. At [strava.com/settings/api](https://www.strava.com/settings/api), create an app with callback
-   domain `localhost`.
-2. `python3 scripts/strava_auth.py` prints a refresh token.
-3. Enter the Client ID, Client Secret and refresh token in `python3 scripts/setup.py secrets`.
+Strava's API Policy (in force since 1 June 2026) forbids using Strava data with AI applications,
+including putting it into a model's context, combining it with other data, and storing it for more
+than 7 days. A coach that reads your data with an AI model cannot follow those rules, so Strava is
+not a source. Record workouts with your watch; Garmin already provides them.
 
 ### Changing sources later
 
