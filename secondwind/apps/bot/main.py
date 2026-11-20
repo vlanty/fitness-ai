@@ -1,9 +1,11 @@
+import hmac
 import logging
 import os
 import sys
 import traceback
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from telegram import Update
 from telegram.error import InvalidToken
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
@@ -20,18 +22,14 @@ sys.excepthook = lambda *exc: sys.stderr.write(log_safety.redact("".join(traceba
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+# Telegram sends this value in X-Telegram-Bot-Api-Secret-Token on every webhook call (set by
+# `scripts/setup.py webhook`). Without it anyone who finds the URL could post fake updates.
+WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "").strip()
+SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token"
 
-app = FastAPI()
 tg = Application.builder().token(BOT_TOKEN).build()
 
-tg.add_handler(CommandHandler("start", _clears_pending(cmd_start)))
-for name, handler in COMMAND_HANDLERS.items():
-    tg.add_handler(CommandHandler(name, handler))
-tg.add_handler(CallbackQueryHandler(on_button, pattern=r"^(cmd|set|prof|goal|cmp|chart):"))
-tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
 
-
-@app.on_event("startup")
 async def startup():
     try:
         await tg.initialize()
@@ -45,8 +43,32 @@ async def startup():
         logger.error("could not register the command menu: %s", e)
 
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    await startup()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+tg.add_handler(CommandHandler("start", _clears_pending(cmd_start)))
+for name, handler in COMMAND_HANDLERS.items():
+    tg.add_handler(CommandHandler(name, handler))
+tg.add_handler(CallbackQueryHandler(on_button, pattern=r"^(cmd|set|prof|goal|cmp|chart):"))
+tg.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
+
+
+def _from_telegram(request: Request) -> bool:
+    """Fail closed: no configured secret means no update is accepted."""
+    got = request.headers.get(SECRET_HEADER, "")
+    return bool(WEBHOOK_SECRET) and hmac.compare_digest(got.encode(), WEBHOOK_SECRET.encode())
+
+
 @app.post("/webhook")
 async def webhook(request: Request):
+    if not _from_telegram(request):
+        logger.warning("webhook: rejected a request without a valid Telegram secret token")
+        return Response(status_code=403)
     data = await request.json()
     update = Update.de_json(data, tg.bot)
     await tg.process_update(update)

@@ -22,7 +22,7 @@ provider "google" {
 
 locals {
   # Secrets every deployment needs.
-  core_secrets = ["telegram_bot_token", "telegram_chat_id", "anthropic_api_key"]
+  core_secrets = ["telegram_bot_token", "telegram_chat_id", "anthropic_api_key", "telegram_webhook_secret"]
 
   # Secrets per data source. Add a new source here (and in secondwind/apps/collector/sources).
   source_secrets = {

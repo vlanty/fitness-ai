@@ -75,6 +75,10 @@ gcloud run services logs read fitness-bot --region ${REGION} --limit=50
 
 **Garmin 401/403 on token.** The key expired or was deleted: see [Garmin key](#garmin-key).
 
+**Bot silent, `POST /webhook` answered with 403.** Telegram's requests do not carry the expected
+secret token (`telegram_webhook_secret`), for example after the secret was regenerated. Run
+`python3 scripts/setup.py webhook`: it sends the current secret to Telegram.
+
 **Bot silent, no `POST /webhook` in its logs.** Telegram is not delivering. Run
 `python3 scripts/setup.py webhook`. This is needed after every Telegram token rotation, because
 Telegram drops the webhook when a token is revoked.
