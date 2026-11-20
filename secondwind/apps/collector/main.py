@@ -2,6 +2,7 @@
 
 Env:
   GCP_PROJECT, BQ_DATASET      target dataset
+  OWNER_USER_ID                whose data this is (solo mode: the one owner)
   DATA_SOURCES                 comma list, e.g. "garmin,strava" (order = priority, used by views)
   RAW_BUCKET                   GCS bucket for raw files (.FIT); optional
   BACKFILL_FROM=YYYY-MM-DD     one-off history load from this date (ignores cursor)
@@ -34,22 +35,29 @@ def windows(start: date, end: date, size: int):
         start = stop + timedelta(days=1)
 
 
-def save(bq: DataWriter, bucket, batch: Batch) -> None:
+def raw_path(user_id: str, path: str) -> str:
+    """Object path of a raw file in the bucket: one folder per user."""
+    return f"users/{user_id}/{path}"
+
+
+def save(bq: DataWriter, bucket, batch: Batch, user_id: str) -> None:
     # Files first: an activity row only points at raw_file once the object exists.
     stored = set()
     for f in batch.files:
         if bucket is None:
             break
-        bucket.blob(f.path).upload_from_string(f.content, content_type=f.content_type)
+        bucket.blob(raw_path(user_id, f.path)).upload_from_string(f.content, content_type=f.content_type)
         stored.add(f.path)
     for a in batch.activities:
         if a.get("raw_file") and a["raw_file"] not in stored:
             a["raw_file"] = None
+        elif a.get("raw_file"):
+            a["raw_file"] = raw_path(user_id, a["raw_file"])
     bq.upsert("activities", batch.activities)
     bq.upsert("health_daily", batch.health_daily)
 
 
-def run_source(name: str, env: dict, bq: DataWriter, state: IngestStore, bucket) -> bool:
+def run_source(name: str, env: dict, bq: DataWriter, state: IngestStore, bucket, user_id: str) -> bool:
     try:
         src = REGISTRY[name](env)
     except KeyError:
@@ -77,7 +85,7 @@ def run_source(name: str, env: dict, bq: DataWriter, state: IngestStore, bucket)
         try:
             batch = src.fetch(w_start, w_end, known)
         except PartialFetch as e:
-            save(bq, bucket, e.batch)
+            save(bq, bucket, e.batch, user_id)
             logger.error("%s %s…%s: частично: %s", name, w_start, w_end, e)
             state.record(name, None, "partial", str(e)[:1000])
             ok = False
@@ -87,7 +95,7 @@ def run_source(name: str, env: dict, bq: DataWriter, state: IngestStore, bucket)
             state.record(name, None, "failed", str(e)[:1000])
             ok = False
             break
-        save(bq, bucket, batch)
+        save(bq, bucket, batch, user_id)
         if not backfill:
             # Cursor = last fully synced day; next run re-reads lookback_days before it.
             state.record(name, w_end, "ok")
@@ -103,14 +111,19 @@ def main() -> int:
         logger.error("DATA_SOURCES пуст — нечего собирать")
         return 2
 
-    bq = BigQueryWriter(env["GCP_PROJECT"], env["BQ_DATASET"])
-    state = IngestState(bq.client, bq.table("ingest_state"))
+    user_id = env.get("OWNER_USER_ID", "").strip()
+    if not user_id:
+        logger.error("OWNER_USER_ID пуст — не знаю, чьи это данные")
+        return 2
+
+    bq = BigQueryWriter(env["GCP_PROJECT"], env["BQ_DATASET"], user_id)
+    state = IngestState(bq.client, bq.table("ingest_state"), user_id)
     bucket = None
     if env.get("RAW_BUCKET"):
         from google.cloud import storage
         bucket = storage.Client(project=env["GCP_PROJECT"]).bucket(env["RAW_BUCKET"])
 
-    results = {n: run_source(n, env, bq, state, bucket) for n in names}
+    results = {n: run_source(n, env, bq, state, bucket, user_id) for n in names}
     logger.info("итог: %s", ", ".join(f"{n}={'ok' if r else 'СБОЙ'}" for n, r in results.items()))
     return 0 if all(results.values()) else 1
 

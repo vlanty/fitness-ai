@@ -19,7 +19,7 @@ locals {
   ]
 }
 
-# ── Normalized tables (all sources, key: source + id/date) ────────────────────
+# ── Normalized tables (all sources, key: user_id + source + id/date) ──────────
 resource "google_bigquery_table" "activities" {
   dataset_id          = google_bigquery_dataset.fitness.dataset_id
   table_id            = "activities"
@@ -59,6 +59,7 @@ resource "google_bigquery_table" "activities" {
     { name = "lthr", type = "INTEGER", mode = "NULLABLE", description = "Lactate threshold HR set on the watch at the time (.FIT)" },
     { name = "fit_max_hr", type = "INTEGER", mode = "NULLABLE", description = "Max HR set on the watch at the time (.FIT)" },
     { name = "fit_resting_hr", type = "INTEGER", mode = "NULLABLE", description = "Resting HR used by the watch at the time (.FIT)" },
+    { name = "user_id", type = "STRING", mode = "NULLABLE", description = "Internal user id (OWNER_USER_ID in solo mode); always set by the collector" },
   ])
 }
 
@@ -103,6 +104,7 @@ resource "google_bigquery_table" "health_daily" {
     { name = "hrv_5min_high", type = "INTEGER", mode = "NULLABLE" },
     { name = "hrv_baseline_low", type = "INTEGER", mode = "NULLABLE", description = "Garmin personal balanced range, low" },
     { name = "hrv_baseline_high", type = "INTEGER", mode = "NULLABLE", description = "Garmin personal balanced range, high" },
+    { name = "user_id", type = "STRING", mode = "NULLABLE", description = "Internal user id (OWNER_USER_ID in solo mode); always set by the collector" },
   ])
 }
 
@@ -118,6 +120,7 @@ resource "google_bigquery_table" "ingest_state" {
     { name = "last_success_at", type = "TIMESTAMP", mode = "NULLABLE" },
     { name = "last_status", type = "STRING", mode = "NULLABLE", description = "ok | partial | failed" },
     { name = "last_error", type = "STRING", mode = "NULLABLE" },
+    { name = "user_id", type = "STRING", mode = "NULLABLE", description = "Internal user id (OWNER_USER_ID in solo mode); always set by the collector" },
   ])
 }
 

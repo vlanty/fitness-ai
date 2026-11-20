@@ -39,7 +39,30 @@ class Upd:
 
 def test_only_owner_chat_allowed(monkeypatch):
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "42")
-    assert handlers._allowed(Upd(42))
+    monkeypatch.setenv("OWNER_USER_ID", "u-1")
+    monkeypatch.delenv("TENANCY", raising=False)
+    assert handlers._allowed(Upd(42)) and handlers._uid(Upd(42)) == "u-1"
     assert not handlers._allowed(Upd(7))
+    monkeypatch.setenv("OWNER_USER_ID", "")       # no user yet: nobody may use the bot
+    assert not handlers._allowed(Upd(42))
+    monkeypatch.setenv("OWNER_USER_ID", "u-1")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "")
     assert not handlers._allowed(Upd(42))
+
+
+def test_multi_tenancy_is_not_enabled_by_accident(monkeypatch):
+    import pytest
+    from secondwind.apps.bot import tenancy
+    monkeypatch.setenv("TENANCY", "multi")
+    with pytest.raises(NotImplementedError):
+        tenancy.user_for_chat(42)
+
+
+def test_memory_store_is_keyed_by_user_and_links_identities():
+    from secondwind.adapters.state.memory import MemoryStore
+    st = MemoryStore()
+    st.update_profile("u-1", {"weight": 70})
+    st.add_usage("u-1", "2026-11", 10, 5, 0.01)
+    st.link_identity("telegram:42", "u-1")
+    assert st.get_user("u-1")["profile"] == {"weight": 70} and st.get_user("u-2") == {}
+    assert st.get_usage("u-1", "2026-11")["calls"] == 1 and st.get_identity("telegram:42") == "u-1"

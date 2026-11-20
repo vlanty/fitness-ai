@@ -49,14 +49,14 @@ def render_settings(lang: str, settings: dict, usage: dict) -> tuple[str, Kb]:
     return "\n".join(lines), kb
 
 
-def apply_setting(store: StateStore, chat_id: int, key: str, value: str) -> bool:
+def apply_setting(store: StateStore, user_id: str, key: str, value: str) -> bool:
     """Validates and stores one setting from a button. False if the button data is unknown."""
     if key == "lang" and value in LANG_CHOICES:
-        store.update_settings(chat_id, {"lang": value})
+        store.update_settings(user_id, {"lang": value})
     elif key == "mode" and value in MODES:
-        store.update_settings(chat_id, {"mode": value})
+        store.update_settings(user_id, {"mode": value})
     elif key == "morning" and value in ("on", "off"):
-        store.update_settings(chat_id, {"morning": value == "on"})
+        store.update_settings(user_id, {"morning": value == "on"})
     else:
         return False
     return True
@@ -148,15 +148,15 @@ def ask_text(lang: str, pending: dict) -> str:
     return t(lang, f"goal.ask.{pending['step']}") + ("" if pending["step"] in ("target", "name") else "\n/cancel")
 
 
-def handle_input(store: StateStore, chat_id: int, lang: str, pending: dict, text: str,
+def handle_input(store: StateStore, user_id: str, lang: str, pending: dict, text: str,
                  today: date, watch: dict | None = None) -> tuple[str, Kb | None]:
     """Applies one text answer to the pending question. Returns the next screen or question."""
     try:
         if pending["kind"] == "profile":
             field = pending["field"]
-            store.update_profile(chat_id, {field: parse_profile_value(field, text)})
-            store.set_pending(chat_id, None)
-            return render_profile(lang, store.get_user(chat_id).get("profile", {}), watch)
+            store.update_profile(user_id, {field: parse_profile_value(field, text)})
+            store.set_pending(user_id, None)
+            return render_profile(lang, store.get_user(user_id).get("profile", {}), watch)
 
         data = dict(pending.get("data", {}))
         step = pending["step"]
@@ -172,12 +172,12 @@ def handle_input(store: StateStore, chat_id: int, lang: str, pending: dict, text
         else:  # name
             name = text.strip()
             data["name"] = None if name.lower() in {"-", "—"} else name[:80]
-            store.set_goal(chat_id, data)
-            store.set_pending(chat_id, None)
+            store.set_goal(user_id, data)
+            store.set_pending(user_id, None)
             body, kb = render_goal(lang, data, today)
             return t(lang, "goal.saved") + "\n\n" + body, kb
         new_pending = {"kind": "goal", "step": nxt, "data": data}
-        store.set_pending(chat_id, new_pending)
+        store.set_pending(user_id, new_pending)
         return ask_text(lang, new_pending), None
     except InvalidInput as e:
         return t(lang, e.key, **e.kw) + "\n\n" + ask_text(lang, pending), None

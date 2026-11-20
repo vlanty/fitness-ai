@@ -35,8 +35,8 @@ def main() -> None:
     bq = bigquery.Client(project=args.project)
     bucket = storage.Client(project=args.project).bucket(args.bucket or f"{args.project}-fitness-raw")
     todo = list(bq.query(
-        f"SELECT source, activity_id, activity_date, raw_file FROM `{args.project}.{args.dataset}.activities` "
-        "WHERE raw_file IS NOT NULL AND hr_zone_bounds IS NULL ORDER BY activity_date").result())
+        f"SELECT user_id, source, activity_id, activity_date, raw_file FROM `{args.project}.{args.dataset}.activities` "
+        "WHERE raw_file IS NOT NULL AND hr_zone_bounds IS NULL AND user_id IS NOT NULL ORDER BY activity_date").result())
     print(f"activities to scan: {len(todo)}")
 
     rows, without = [], 0
@@ -44,7 +44,7 @@ def main() -> None:
         zones = extract_zones(bucket.blob(r.raw_file).download_as_bytes())
         if zones:
             # ingested_at None: the MERGE keeps the original load time.
-            rows.append({"source": r.source, "activity_id": r.activity_id,
+            rows.append({"user_id": r.user_id, "source": r.source, "activity_id": r.activity_id,
                          "activity_date": r.activity_date.isoformat(), "ingested_at": None, **zones})
         else:
             without += 1
@@ -57,7 +57,10 @@ def main() -> None:
             print(f"LTHR first {lthr[0]}, last {lthr[-1]}, distinct values: {sorted({v for _, v in lthr})}")
     if args.dry_run or not rows:
         return
-    written = BigQueryWriter(args.project, args.dataset, client=bq).upsert("activities", rows)
+    written = 0
+    for uid in sorted({r["user_id"] for r in rows}):
+        mine = [r for r in rows if r["user_id"] == uid]
+        written += BigQueryWriter(args.project, args.dataset, uid, client=bq).upsert("activities", mine)
     print(f"written: {written}")
 
 

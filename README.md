@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>A personal AI coach that lives in your Telegram.</b><br>
-  🔒 your own Google Cloud project · 💸 about $1–2 a month · 🌍 Russian and English
+  🔒 runs in your own Google Cloud project · 💸 about $1–2 a month · 🌍 Russian and English
 </p>
 
 Meet **Vita**. She reads your Garmin and Strava data and answers like a coach, a sports doctor
@@ -36,11 +36,21 @@ and your full history is loaded on first install.
 Only your chat gets answers. Your data is stored only in your own cloud project; for AI answers,
 a summary of it is sent to the AI model.
 
+## Where it runs
+
+**Today:** Google Cloud for hosting and data, Claude for answers.
+
+**Planned:**
+- ☁️ other popular clouds, such as AWS and Azure
+- 🧠 other popular AI models, such as OpenAI's
+- 🏠 a compact on-premises version for your own server or home lab. It will still use hosted AI
+  models through their APIs; no local model is required.
+
 ## Documentation
 
 | | |
 |---|---|
-| 🚀 [Setup](docs/setup.md) | install in your Google Cloud project, connect Garmin and Strava, bot settings |
+| 🚀 [Setup](docs/setup.md) | install in Google Cloud, connect Garmin and Strava, bot settings |
 | 🛠 [Operations](docs/operations.md) | updating, rotating keys and tokens, troubleshooting |
 | 🔬 [How it works](docs/how-it-works.md) | architecture, merging sources, how load, readiness, status and zones are calculated |
 | 🤖 [Commands](docs/commands.md) | every bot command and what it shows |

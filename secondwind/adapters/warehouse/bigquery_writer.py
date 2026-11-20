@@ -1,4 +1,6 @@
-"""Idempotent writes to BigQuery: load to a staging table, then MERGE on a composite key."""
+"""Idempotent writes to BigQuery: load to a staging table, then MERGE on a composite key.
+
+A writer belongs to one user: it stamps `user_id` on every row and the MERGE key starts with it."""
 
 from __future__ import annotations
 
@@ -11,8 +13,8 @@ from google.cloud import bigquery
 logger = logging.getLogger(__name__)
 
 KEYS = {
-    "activities": ("source", "activity_id"),
-    "health_daily": ("source", "date"),
+    "activities": ("user_id", "source", "activity_id"),
+    "health_daily": ("user_id", "source", "date"),
 }
 
 
@@ -36,9 +38,13 @@ def merge_sql(table: str, stage: str, cols: list[str], key: tuple[str, ...]) -> 
 
 
 class BigQueryWriter:
-    def __init__(self, project_id: str, dataset_id: str, client: bigquery.Client | None = None) -> None:
+    def __init__(self, project_id: str, dataset_id: str, user_id: str,
+                 client: bigquery.Client | None = None) -> None:
+        if not user_id:
+            raise ValueError("user_id is required")
         self.client = client or bigquery.Client(project=project_id)
         self.prefix = f"{project_id}.{dataset_id}"
+        self.user_id = user_id
 
     def table(self, name: str) -> str:
         return f"{self.prefix}.{name}"
@@ -47,6 +53,9 @@ class BigQueryWriter:
         if not rows:
             return 0
         key = KEYS[table_name]
+        if any(r.get("user_id") not in (None, self.user_id) for r in rows):
+            raise ValueError(f"rows for another user passed to the writer of {self.user_id}")
+        rows = [{**r, "user_id": self.user_id} for r in rows]
         target = self.client.get_table(self.table(table_name))
         cols = [f.name for f in target.schema]
         now = datetime.now(timezone.utc).isoformat()
@@ -67,8 +76,9 @@ class BigQueryWriter:
         """Activity ids whose raw file is already in GCS (skip re-downloading)."""
         job = self.client.query(
             f"SELECT activity_id FROM `{self.table('activities')}` "
-            "WHERE source = @s AND raw_file IS NOT NULL AND activity_date >= @d",
+            "WHERE user_id = @uid AND source = @s AND raw_file IS NOT NULL AND activity_date >= @d",
             job_config=bigquery.QueryJobConfig(query_parameters=[
+                bigquery.ScalarQueryParameter("uid", "STRING", self.user_id),
                 bigquery.ScalarQueryParameter("s", "STRING", source),
                 bigquery.ScalarQueryParameter("d", "DATE", start),
             ]))

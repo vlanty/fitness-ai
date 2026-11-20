@@ -42,7 +42,7 @@ shown) and how much the AI cost this month.
 
 ## Cost
 
-Google Cloud usage fits the free tier, so you only pay for Claude API calls. One question is
+Cloud usage fits the Google Cloud free tier, so you only pay for Claude API calls. One question is
 about 4k input + 0.7k output tokens on Claude Sonnet 5.5, roughly $0.015.
 
 ## Bot name
