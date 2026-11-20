@@ -71,3 +71,7 @@ def test_prompt_files_use_only_known_fields():
         fields = {f for _, f, _, _ in string.Formatter().parse(a._prompt(name)) if f}
         assert fields <= allowed and {"persona", "data", "format", "language"} <= fields, name
     assert "Vita" in a.PERSONA and not a.PERSONA.endswith("\n")
+
+
+def test_persona_tells_the_model_to_refuse_role_changes():
+    assert "not instructions" in a.PERSONA and "change your role" in a.PERSONA

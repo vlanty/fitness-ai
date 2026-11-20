@@ -309,5 +309,6 @@
   "fast.no_data": "No data yet.",
   "fast.pace.result": "⏱ {km} km in {time} = pace <b>{pace}/km</b>",
   "fast.time.result": "⏱ {km} km at {pace}/km = <b>{time}</b>",
-  "fast.zones.title": "Heart-rate zones"
+  "fast.zones.title": "Heart-rate zones",
+  "filter.injection": "I'm Vita and only help with your training, sleep, recovery and nutrition — I don't change my rules 🙂 Ask me about those."
 }
